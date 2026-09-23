@@ -1,24 +1,12 @@
 """
 Compute correlations between optimal calibration parameters and geometry features.
 
-This uses the same SteelMPF-specific optimum as ``plot_individual_optimal_params_vs_geometry.py``:
+Uses the same optimum rule as ``plot_individual_optimal_params_vs_geometry.py``: minimum
+``final_J_feat_raw`` over successful metrics rows in the requested ``set_id`` range, joined to
+``optimized_brb_parameters.csv``. Geometry features match the montage plots.
 
-- "Optimal" per specimen for these correlations is the best **SteelMPF** row: minimum
-  ``final_J_feat_raw`` over successful metrics rows whose ``steel_model`` is SteelMPF in the
-  requested ``set_id`` range, joined to ``optimized_brb_parameters.csv``. (Steel4 uses a separate
-  optimum in the plot script only.)
-- Geometry features are the same 12 columns used in the montage plots.
-
-Outputs:
-- A tidy CSV of pairwise correlations (Pearson and Spearman) with sample counts.
-- Spearman heatmap PNGs for quick scanning.
-
-Default output locations:
-- CSV (train):  summary_statistics/param_geometry_correlations_train.csv
-- PNG (train):  results/plots/calibration/individual_optimize/param_geometry_correlations/spearman_heatmaps_train.png
-- PNG (extended): same folder, ``spearman_heatmaps_train_extended.png``
-- Steel4 (best Steel4 row per specimen, same optimum rule as geometry plots): under
-  ``.../param_geometry_correlations/steel4/`` plus ``summary_statistics/param_geometry_correlations_train_steel4.csv``.
+Outputs: tidy CSV of pairwise correlations (Pearson and Spearman) and heatmap PNGs under
+``param_geometry_correlations/`` (default paths in ``--out-csv`` / ``--out-dir``).
 """
 
 from __future__ import annotations
@@ -35,11 +23,6 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 _SCRIPTS = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_SCRIPTS))
 
-from calibrate.steel_model import (  # noqa: E402
-    STEEL_MODEL_STEEL4,
-    STEEL_MODEL_STEELMPF,
-    normalize_steel_model,
-)
 
 
 def _repo_root() -> Path:
@@ -72,26 +55,7 @@ def _resolve_set_ids(spec: str, metrics: pd.DataFrame) -> list[int]:
     return _parse_set_range(spec)
 
 
-# Same finite-column idea as ``plot_individual_optimal_params_vs_geometry.STEEL4_OPTIMUM_FINITE_COLS``.
-_STEEL4_OPT_GEOM_COLS: tuple[str, ...] = (
-    "R0",
-    "cR1",
-    "cR2",
-    "b_p",
-    "b_n",
-    "b_ip",
-    "rho_ip",
-    "b_lp",
-    "R_i",
-    "l_yp",
-    "b_ic",
-    "rho_ic",
-    "b_lc",
-)
-STEEL4_OPTIMUM_FINITE_COLS: tuple[str, ...] = tuple(
-    dict.fromkeys([*("R0", "cR1", "cR2", "E", "b_p", "b_n"), *_STEEL4_OPT_GEOM_COLS])
-)
-_METRIC_PARAM_CHECK_STEELMPF: tuple[str, ...] = (
+_METRIC_PARAM_CHECK: tuple[str, ...] = (
     "R0",
     "cR1",
     "cR2",
@@ -113,10 +77,10 @@ def _read_csv_skip_hash(path: Path) -> pd.DataFrame:
     return df
 
 
-def _pick_optimal_rows_by_steel_model(
+def _pick_optimal_rows(
     metrics: pd.DataFrame, optimized: pd.DataFrame, set_ids: list[int]
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Best row per specimen within SteelMPF and Steel4 (min ``final_J_feat_raw`` each)."""
+) -> pd.DataFrame:
+    """Best row per specimen (min ``final_J_feat_raw``) over successful metrics in ``set_ids``."""
     m = metrics[
         metrics["set_id"].isin(set_ids)
         & metrics["success"].astype(bool)
@@ -125,93 +89,54 @@ def _pick_optimal_rows_by_steel_model(
     if m.empty:
         raise ValueError("No successful metrics rows in the given set range.")
 
-    # Keep merge columns aligned with ``plot_individual_optimal_params_vs_geometry`` (wide steel CSV).
-    need_cols = list(
-        dict.fromkeys(
-            [
-                "Name",
-                "set_id",
-                "steel_model",
-                "R0",
-                "cR1",
-                "cR2",
-                "a1",
-                "a3",
-                "b_p",
-                "b_n",
-                "E",
-                "b_ip",
-                "rho_ip",
-                "b_lp",
-                "R_i",
-                "l_yp",
-                "b_ic",
-                "rho_ic",
-                "b_lc",
-            ]
-        )
-    )
+    need_cols = list(dict.fromkeys(["Name", "set_id", "steel_model", *_METRIC_PARAM_CHECK]))
     missing = [c for c in need_cols if c not in optimized.columns]
     if missing:
         raise KeyError(f"optimized_brb_parameters missing columns: {missing}")
     opt = optimized[need_cols].copy()
-
     merged = m.merge(opt, on=["Name", "set_id"], how="inner")
-
-    def _best_for_model(model: str) -> pd.DataFrame:
-        sub = merged[
-            merged["steel_model"].map(lambda x, m=model: normalize_steel_model(x) == m)
-        ].copy()
-        if sub.empty:
-            return pd.DataFrame(columns=list(merged.columns))
-        finite_cols = (
-            list(_METRIC_PARAM_CHECK_STEELMPF)
-            if model == STEEL_MODEL_STEELMPF
-            else list(STEEL4_OPTIMUM_FINITE_COLS)
-        )
-        for c in finite_cols:
-            if c not in sub.columns:
-                continue
-            sub = sub[np.isfinite(pd.to_numeric(sub[c], errors="coerce"))]
-        if sub.empty:
-            return pd.DataFrame(columns=list(merged.columns))
-        sub = sub.sort_values(["Name", "final_J_feat_raw"])
-        return sub.groupby("Name", as_index=False).first()
-
-    return (
-        _best_for_model(STEEL_MODEL_STEELMPF),
-        _best_for_model(STEEL_MODEL_STEEL4),
-    )
+    sub = merged.copy()
+    for c in _METRIC_PARAM_CHECK:
+        if c not in sub.columns:
+            continue
+        sub = sub[np.isfinite(pd.to_numeric(sub[c], errors="coerce"))]
+    if sub.empty:
+        return pd.DataFrame(columns=list(merged.columns))
+    sub = sub.sort_values(["Name", "final_J_feat_raw"])
+    return sub.groupby("Name", as_index=False).first()
 
 
 def _resolve_Q(catalog_row: pd.Series) -> float:
-    # Same convention as plot_individual_optimal_params_vs_geometry.py: Q = 1 + A_t/A_sc.
-    Asc = float(catalog_row["A_c_in2"])
-    At = float(catalog_row["A_t_in2"])
-    return 1.0 + At / Asc
+    from model.brace_geometry import compute_Q
+
+    L_T = float(catalog_row["L_T_in"])
+    L_y = float(catalog_row["L_y_in"])
+    A_sc = float(catalog_row["A_c_in2"])
+    A_t = float(catalog_row["A_t_in2"])
+    return compute_Q(L_T, L_y, A_sc, A_t)
 
 
 def _geometry_features(catalog_row: pd.Series, E_kpsi: float, Q: float) -> dict[str, float]:
-    Ly = float(catalog_row["L_y_in"])
-    LT = float(catalog_row["L_T_in"])
-    Asc = float(catalog_row["A_c_in2"])
+    L_y = float(catalog_row["L_y_in"])
+    L_T = float(catalog_row["L_T_in"])
+    A_sc = float(catalog_row["A_c_in2"])
     fy = float(catalog_row["f_yc_ksi"])
-    if Asc <= 0:
+    if A_sc <= 0:
         raise ValueError(f"Non-positive A_c_in2 for {catalog_row.get('Name')!r}")
-    Ly2_A = Ly**2 / Asc
-    LT2_A = LT**2 / Asc
+    Ly2_A = L_y**2 / A_sc
+    LT2_A = L_T**2 / A_sc
     E_over_fy = E_kpsi / fy
     QE_over_fy = Q * E_over_fy
-    Ly2 = Ly * Ly
-    LT2 = LT * LT
-    E_Asc_over_fy_Ly2 = (E_kpsi * Asc) / (fy * Ly2) if Ly2 else np.nan
-    E_Asc_over_fy_LT2 = (E_kpsi * Asc) / (fy * LT2) if LT2 else np.nan
+    Ly2 = L_y * L_y
+    LT2 = L_T * L_T
+    E_Asc_over_fy_Ly2 = (E_kpsi * A_sc) / (fy * Ly2) if Ly2 else np.nan
+    E_Asc_over_fy_LT2 = (E_kpsi * A_sc) / (fy * LT2) if LT2 else np.nan
     QE_Asc_over_fy_Ly2 = Q * E_Asc_over_fy_Ly2 if np.isfinite(E_Asc_over_fy_Ly2) else np.nan
     QE_Asc_over_fy_LT2 = Q * E_Asc_over_fy_LT2 if np.isfinite(E_Asc_over_fy_LT2) else np.nan
     return {
-        "L_y": Ly,
-        "L_T": LT,
-        "A_sc": Asc,
+        "L_y": L_y,
+        "L_T": L_T,
+        "A_sc": A_sc,
         "Ly2_over_A_sc": Ly2_A,
         "LT2_over_A_sc": LT2_A,
         "E_div_fy": E_over_fy,
@@ -265,37 +190,6 @@ PARAM_LATEX: dict[str, str] = {
     "b_p": r"$b_p$",
     "b_n": r"$b_n$",
 }
-
-PARAM_COLS_STEEL4: list[str] = [
-    "cR1",
-    "cR2",
-    "b_ip",
-    "rho_ip",
-    "b_lp",
-    "R_i",
-    "l_yp",
-    "b_ic",
-    "rho_ic",
-    "b_lc",
-    "b_p",
-    "b_n",
-]
-
-PARAM_LATEX_STEEL4: dict[str, str] = {
-    "cR1": r"$c_{R1}$",
-    "cR2": r"$c_{R2}$",
-    "b_ip": r"$b_{ip}$",
-    "rho_ip": r"$\rho_{ip}$",
-    "b_lp": r"$b_{lp}$",
-    "R_i": r"$R_i$",
-    "l_yp": r"$l_{yp}$",
-    "b_ic": r"$b_{ic}$",
-    "rho_ic": r"$\rho_{ic}$",
-    "b_lc": r"$b_{lc}$",
-    "b_p": r"$b_p$",
-    "b_n": r"$b_n$",
-}
-
 
 def _build_train_frame(
     catalog: pd.DataFrame, best: pd.DataFrame, param_cols: list[str] | None = None
@@ -627,12 +521,11 @@ def main() -> None:
         }
     )
 
-    best_mpf, best_s4 = _pick_optimal_rows_by_steel_model(metrics, optimized, set_ids)
-    best = best_mpf
+    best = _pick_optimal_rows(metrics, optimized, set_ids)
     if best.empty:
         raise SystemExit(
-            "No SteelMPF optimum in the set range: cannot build MPF correlation tables "
-            "(same basis as geometry plots /steelmpf)."
+            "No optimum rows in the set range: cannot build correlation tables "
+            "(same basis as geometry plots under /steelmpf)."
         )
     df_train = _build_train_frame(catalog, best)
     if df_train.empty:
@@ -721,55 +614,6 @@ def main() -> None:
         n_pg=n_pg,
         n_pp=n_pp,
     )
-
-    steel4_dir = Path(args.out_dir) / "steel4"
-    pcols4 = [c for c in PARAM_COLS_STEEL4 if c in optimized.columns and c in best_s4.columns]
-    if best_s4.empty or not pcols4:
-        print(
-            "Steel4 correlation bundle skipped: no Steel4 optimum rows after merge and "
-            "model-specific finite-parameter filters (see --sets; default 'all' includes every "
-            "successful set_id), or optimized params lack required columns."
-        )
-    else:
-        df_train4 = _build_train_frame(catalog, best_s4, pcols4)
-        if df_train4.empty:
-            print("Steel4 train correlation frame empty; skip param_geometry_correlations/steel4/.")
-        else:
-            steel4_dir.mkdir(parents=True, exist_ok=True)
-            tidy4 = _tidy_correlations(df_train4, geometry_cols=GEOMETRY_COLS, param_cols=pcols4)
-            tidy4.to_csv(
-                args.out_csv.parent / "param_geometry_correlations_train_steel4.csv",
-                index=False,
-            )
-            s_pg4 = _corr_matrix(
-                df_train4, geometry_cols=GEOMETRY_COLS, param_cols=pcols4, method="spearman"
-            )
-            s_pp4 = _corr_matrix(df_train4, geometry_cols=pcols4, param_cols=pcols4, method="spearman")
-            s_pg4.to_csv(steel4_dir / "spearman_matrix_train.csv")
-            s_pp4.to_csv(steel4_dir / "spearman_params_matrix_train.csv")
-            _combined_train_heatmap(
-                s_pg4,
-                s_pp4,
-                out_path=steel4_dir / "spearman_heatmaps_train.png",
-                title="",
-                cbar_label="Spearman ρ",
-                param_latex_map=PARAM_LATEX_STEEL4,
-            )
-            p_pg4 = _corr_matrix(
-                df_train4, geometry_cols=GEOMETRY_COLS, param_cols=pcols4, method="pearson"
-            )
-            p_pp4 = _corr_matrix(df_train4, geometry_cols=pcols4, param_cols=pcols4, method="pearson")
-            p_pg4.to_csv(steel4_dir / "pearson_matrix_train.csv")
-            p_pp4.to_csv(steel4_dir / "pearson_params_matrix_train.csv")
-            _combined_train_heatmap(
-                p_pg4,
-                p_pp4,
-                out_path=steel4_dir / "pearson_heatmaps_train.png",
-                title="",
-                cbar_label="Pearson r",
-                param_latex_map=PARAM_LATEX_STEEL4,
-            )
-
 
 if __name__ == "__main__":
     main()

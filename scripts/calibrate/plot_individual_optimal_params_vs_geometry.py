@@ -1,26 +1,19 @@
 """
-Scatter optimal individual-calibration parameters vs specimen geometry.
+Scatter optimal individual-calibration parameters vs specimen geometry (SteelMPF).
 
 - Geometry: 12 metrics in a 3×4 panel grid (L_y, L_T, A_sc, L²/A_sc for L_y and L_T, E/f_y,
   Q, QE/f_y, then E A_sc/(f_y L²) and Q E A_sc/(f_y L²) for L_y and L_T). X-limits snap to
   metric-specific multiples (50, 10, 5, …) so every panel contains its scatter data.
-- SteelMPF: parameters from each specimen's **best SteelMPF** run (min ``final_J_feat_raw`` among
-  SteelMPF ``set_id`` in range); R0, cR1, cR2, R0(1−cR1), a1, a3 and ``b_p``/``b_n`` under
-  ``<out-dir>/steelmpf/`` (generalized-train subset for train-only panels).
-- Steel4: parameters from each specimen's **best Steel4** run (same rule within Steel4 rows only);
-  shared kinematic columns plus ``b_ip``, ``b_lp``, ``b_ic``, ``b_lc``, ``rho_ip``, ``rho_ic``,
-  ``R_i``, ``l_yp`` under ``<out-dir>/steel4/`` (all specimens with a Steel4 optimum in range).
-  Steel4 montages use **data-driven Y limits** (small margin, no step snapping).
-- b_p / b_n: train-only PNGs plus extended PNGs (SteelMPF, Steel4) that mix optimal b
-  for individually optimized non-train specimens and apparent (digitized) means for the rest.
-  Extended figures overlay the train cohort mean and least-squares linear fit (legend: ``Mean (train)``,
-  ``Linear fit (train)``). Y-limits use the same snapped range for a1 and a3 (and separately
-  for b_p / b_n per cohort).
+- SteelMPF: parameters from each specimen's best run (min ``final_J_feat_raw`` among ``set_id`` in range);
+  R0, cR1, cR2, R0(1−cR1), a1, a3 and ``b_p``/``b_n`` under ``<out-dir>/steelmpf/`` (generalized-train
+  subset for train-only panels).
+- b_p / b_n: train-only PNGs plus extended PNGs that mix optimal b for individually optimized
+  non-train specimens and apparent (digitized) means for the rest. Extended figures overlay the train
+  cohort mean and least-squares linear fit. Y-limits use the same snapped range for a1 and a3 (and
+  separately for b_p / b_n).
 
-Optimal parameters are chosen **separately per steel model**: for each specimen, among successful
-metrics rows in the requested ``set_id`` range, take the row with minimum ``final_J_feat_raw`` **within
-SteelMPF** and **within Steel4** runs (one optimum each). Each scatter cohort uses the parameters from
-that model-specific winner, joined to ``optimized_brb_parameters``.
+Per specimen, among successful metrics rows in the requested ``set_id`` range, take the row with
+minimum ``final_J_feat_raw``, joined to ``optimized_brb_parameters``.
 """
 
 from __future__ import annotations
@@ -49,12 +42,6 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from postprocess.specimen_colors import specimen_color_by_name_map  # noqa: E402
 
-from calibrate.steel_model import (  # noqa: E402
-    STEEL_MODEL_STEEL4,
-    STEEL_MODEL_STEELMPF,
-    normalize_steel_model,
-)
-
 METRIC_PARAM_CHECK = [
     "R0",
     "cR1",
@@ -66,29 +53,7 @@ METRIC_PARAM_CHECK = [
     "E",
 ]
 
-# Columns read from ``optimized_brb_parameters`` for Steel4 vs-geometry frames (subset of wide CSV).
-STEEL4_OPT_GEOM_COLS: tuple[str, ...] = (
-    "R0",
-    "cR1",
-    "cR2",
-    "b_p",
-    "b_n",
-    "b_ip",
-    "rho_ip",
-    "b_lp",
-    "R_i",
-    "l_yp",
-    "b_ic",
-    "rho_ic",
-    "b_lc",
-)
-
 _R0_1_MINUS_CR1_COL = "R0(1−cR1)"  # Unicode minus, matches DataFrame column name
-
-# Columns required finite when picking a Steel4 optimum (SteelMPF-only fields like a1/a3 may be blank).
-STEEL4_OPTIMUM_FINITE_COLS: tuple[str, ...] = tuple(
-    dict.fromkeys([*("R0", "cR1", "cR2", "E", "b_p", "b_n"), *STEEL4_OPT_GEOM_COLS])
-)
 
 # X-axis limit step per geometry column (limits = multiples of step, enclosing all data).
 _X_STEP_BY_XKEY: dict[str, float] = {
@@ -238,13 +203,10 @@ def _legend_name_order(catalog: pd.DataFrame, present_names: set[str]) -> list[s
     ]
 
 
-def _pick_optimal_rows_by_steel_model(
+def _pick_optimal_rows(
     metrics: pd.DataFrame, optimized: pd.DataFrame, set_ids: list[int]
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Per specimen, best (min ``final_J_feat_raw``) row **within SteelMPF** and **within Steel4**,
-    independently, over successful metrics in ``set_ids``.
-    """
+) -> pd.DataFrame:
+    """Per specimen, best (min ``final_J_feat_raw``) row over successful metrics in ``set_ids``."""
     m = metrics[
         metrics["set_id"].isin(set_ids)
         & metrics["success"].astype(bool)
@@ -253,41 +215,21 @@ def _pick_optimal_rows_by_steel_model(
     if m.empty:
         raise ValueError("No successful metrics rows in the given set range.")
 
-    # Wide steel columns (Steel4 ``-iso``) merged onto metrics.
-    need_cols = list(
-        dict.fromkeys(
-            ["Name", "set_id", "steel_model", *METRIC_PARAM_CHECK, *STEEL4_OPT_GEOM_COLS]
-        )
-    )
+    need_cols = list(dict.fromkeys(["Name", "set_id", "steel_model", *METRIC_PARAM_CHECK]))
     missing = [c for c in need_cols if c not in optimized.columns]
     if missing:
         raise KeyError(f"optimized_brb_parameters missing columns: {missing}")
     opt = optimized[need_cols].copy()
-
     merged = m.merge(opt, on=["Name", "set_id"], how="inner")
-
-    def _best_for_model(model: str) -> pd.DataFrame:
-        sub = merged[
-            merged["steel_model"].map(lambda x, m=model: normalize_steel_model(x) == m)
-        ].copy()
-        if sub.empty:
-            return pd.DataFrame(columns=list(merged.columns))
-        finite_cols = (
-            METRIC_PARAM_CHECK if model == STEEL_MODEL_STEELMPF else list(STEEL4_OPTIMUM_FINITE_COLS)
-        )
-        for c in finite_cols:
-            if c not in sub.columns:
-                continue
-            sub = sub[np.isfinite(pd.to_numeric(sub[c], errors="coerce"))]
-        if sub.empty:
-            return pd.DataFrame(columns=list(merged.columns))
-        sub = sub.sort_values(["Name", "final_J_feat_raw"])
-        return sub.groupby("Name", as_index=False).first()
-
-    return (
-        _best_for_model(STEEL_MODEL_STEELMPF),
-        _best_for_model(STEEL_MODEL_STEEL4),
-    )
+    sub = merged.copy()
+    for c in METRIC_PARAM_CHECK:
+        if c not in sub.columns:
+            continue
+        sub = sub[np.isfinite(pd.to_numeric(sub[c], errors="coerce"))]
+    if sub.empty:
+        return pd.DataFrame(columns=list(merged.columns))
+    sub = sub.sort_values(["Name", "final_J_feat_raw"])
+    return sub.groupby("Name", as_index=False).first()
 
 
 def _resolve_Q(catalog_row: pd.Series, apparent_row: pd.Series | None) -> float:
@@ -295,9 +237,13 @@ def _resolve_Q(catalog_row: pd.Series, apparent_row: pd.Series | None) -> float:
         q = apparent_row.get("Q")
         if q is not None and pd.notna(q):
             return float(q)
-    Asc = float(catalog_row["A_c_in2"])
-    At = float(catalog_row["A_t_in2"])
-    return 1.0 + At / Asc
+    from model.brace_geometry import compute_Q
+
+    L_T = float(catalog_row["L_T_in"])
+    L_y = float(catalog_row["L_y_in"])
+    A_sc = float(catalog_row["A_c_in2"])
+    A_t = float(catalog_row["A_t_in2"])
+    return compute_Q(L_T, L_y, A_sc, A_t)
 
 
 def _resolve_E_kpsi(
@@ -320,26 +266,26 @@ def _geometry_features(
     E_kpsi: float,
     Q: float,
 ) -> dict[str, float]:
-    Ly = float(catalog_row["L_y_in"])
-    LT = float(catalog_row["L_T_in"])
-    Asc = float(catalog_row["A_c_in2"])
+    L_y = float(catalog_row["L_y_in"])
+    L_T = float(catalog_row["L_T_in"])
+    A_sc = float(catalog_row["A_c_in2"])
     fy = float(catalog_row["f_yc_ksi"])
-    if Asc <= 0:
+    if A_sc <= 0:
         raise ValueError(f"Non-positive A_c_in2 for {catalog_row.get('Name')!r}")
-    Ly2_A = Ly**2 / Asc
-    LT2_A = LT**2 / Asc
+    Ly2_A = L_y**2 / A_sc
+    LT2_A = L_T**2 / A_sc
     E_over_fy = E_kpsi / fy
     QE_over_fy = Q * E_over_fy
-    Ly2 = Ly * Ly
-    LT2 = LT * LT
-    E_Asc_over_fy_Ly2 = (E_kpsi * Asc) / (fy * Ly2) if Ly2 else np.nan
-    E_Asc_over_fy_LT2 = (E_kpsi * Asc) / (fy * LT2) if LT2 else np.nan
+    Ly2 = L_y * L_y
+    LT2 = L_T * L_T
+    E_Asc_over_fy_Ly2 = (E_kpsi * A_sc) / (fy * Ly2) if Ly2 else np.nan
+    E_Asc_over_fy_LT2 = (E_kpsi * A_sc) / (fy * LT2) if LT2 else np.nan
     QE_Asc_over_fy_Ly2 = Q * E_Asc_over_fy_Ly2 if np.isfinite(E_Asc_over_fy_Ly2) else np.nan
     QE_Asc_over_fy_LT2 = Q * E_Asc_over_fy_LT2 if np.isfinite(E_Asc_over_fy_LT2) else np.nan
     return {
-        "L_y": Ly,
-        "L_T": LT,
-        "A_sc": Asc,
+        "L_y": L_y,
+        "L_T": L_T,
+        "A_sc": A_sc,
         # Length squared over core area (same units as L²/A when L [in], A [in²]).
         "Ly2_over_A_sc": Ly2_A,
         "LT2_over_A_sc": LT2_A,
@@ -400,36 +346,6 @@ def _build_frame_for_names(
         for p in extra_steel_cols:
             if p in opt.index:
                 row[p] = float(opt[p])
-        rows.append(row)
-    return pd.DataFrame(rows)
-
-
-def _build_frame_for_names_steel4(
-    catalog: pd.DataFrame,
-    best: pd.DataFrame,
-    names: list[str],
-    apparent: pd.DataFrame,
-) -> pd.DataFrame:
-    """Geometry + Steel4 parameter columns for specimens whose optimal row is ``steel4``."""
-    cat = catalog.set_index("Name")
-    b = best.set_index("Name")
-    app = apparent.set_index("Name")
-    rows = []
-    for name in names:
-        if name not in cat.index or name not in b.index:
-            continue
-        crow = cat.loc[name]
-        opt = b.loc[name]
-        if normalize_steel_model(opt.get("steel_model")) != STEEL_MODEL_STEEL4:
-            continue
-        arow = app.loc[name] if name in app.index else None
-        E = float(opt["E"])
-        Q = _resolve_Q(crow, arow)
-        g = _geometry_features(crow, E, Q)
-        row = {"Name": name, **g}
-        for p in STEEL4_OPT_GEOM_COLS:
-            row[p] = float(opt[p])
-        row[_R0_1_MINUS_CR1_COL] = float(opt["R0"]) * (1.0 - float(opt["cR1"]))
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -738,49 +654,6 @@ def _extended_bp_bn_frame(
     return pd.DataFrame(rows)
 
 
-def _extended_bp_bn_frame_steel4(
-    catalog: pd.DataFrame,
-    best_steel4: pd.DataFrame,
-    apparent: pd.DataFrame,
-) -> pd.DataFrame:
-    """
-    Like ``_extended_bp_bn_frame`` but optimal ``b_p``/``b_n`` come only from rows in
-    ``best_steel4`` (specimens whose best set used Steel4).
-    """
-    cat = catalog.set_index("Name")
-    best = best_steel4.set_index("Name")
-    app = apparent.set_index("Name")
-
-    rows = []
-    for name in cat.index:
-        row_cat = cat.loc[name]
-        gw = int(float(row_cat["generalized_weight"]))
-        io = _as_bool(row_cat["individual_optimize"])
-        arow = app.loc[name] if name in app.index else None
-        E_opt = float(best.loc[name]["E"]) if name in best.index else None
-        E = _resolve_E_kpsi(row_cat, arow, E_opt)
-        Q = _resolve_Q(row_cat, arow)
-        g = _geometry_features(row_cat, E, Q)
-        rec = {"Name": name, **g}
-
-        if gw > 0 or io:
-            if name not in best.index:
-                continue
-            rec["b_p"] = float(best.loc[name]["b_p"])
-            rec["b_n"] = float(best.loc[name]["b_n"])
-        else:
-            if name not in app.index:
-                continue
-            bp = app.loc[name].get("b_p_mean")
-            bn = app.loc[name].get("b_n_mean")
-            if pd.isna(bp) or pd.isna(bn):
-                continue
-            rec["b_p"] = float(bp)
-            rec["b_n"] = float(bn)
-        rows.append(rec)
-    return pd.DataFrame(rows)
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     root = _repo_root()
@@ -829,8 +702,7 @@ def main() -> None:
         default="all",
         help=(
             "Comma list or a-b inclusive set_id range used to pick each specimen's best row. "
-            "Default 'all' uses every set_id that has at least one successful metrics row "
-            "(include Steel4 rows, e.g. 11-12, without listing them explicitly)."
+            "Default 'all' uses every set_id that has at least one successful metrics row."
         ),
     )
     args = parser.parse_args()
@@ -846,7 +718,7 @@ def main() -> None:
     apparent = pd.read_csv(args.apparent_bn_bp)
     set_ids = _resolve_set_ids(args.sets, metrics)
 
-    best_mpf, best_s4 = _pick_optimal_rows_by_steel_model(metrics, optimized, set_ids)
+    best = _pick_optimal_rows(metrics, optimized, set_ids)
 
     name_to_color = specimen_color_by_name_map(catalog)
 
@@ -854,15 +726,14 @@ def main() -> None:
     gw_pos = catalog.loc[gw > 0, "Name"].tolist()
 
     steelmpf_dir = args.out_dir / "steelmpf"
-    steel4_dir = args.out_dir / "steel4"
     train_names_mpf = [
-        n for n in gw_pos if n in set(best_mpf["Name"].astype(str).tolist())
+        n for n in gw_pos if n in set(best["Name"].astype(str).tolist())
     ]
-    train_df = _build_frame_for_names(catalog, best_mpf, train_names_mpf, apparent)
+    train_df = _build_frame_for_names(catalog, best, train_names_mpf, apparent)
 
     if train_df.empty:
         print(
-            "SteelMPF optimal cohort: no generalized-train specimens with a SteelMPF optimum "
+            "Optimal cohort: no generalized-train specimens with an optimum "
             "in the set range; skip steelmpf/ train plots."
         )
     else:
@@ -915,9 +786,9 @@ def main() -> None:
             y_limits=ylim_bp_bn_train,
         )
 
-    ext_df = _extended_bp_bn_frame(catalog, best_mpf, apparent)
+    ext_df = _extended_bp_bn_frame(catalog, best, apparent)
     if ext_df.empty:
-        print("SteelMPF extended b_p/b_n frame empty; skip steelmpf/ extended plots.")
+        print("Extended b_p/b_n frame empty; skip steelmpf/ extended plots.")
     else:
         ext_legend = _legend_name_order(
             catalog, set(ext_df["Name"].astype(str).tolist())
@@ -947,110 +818,6 @@ def main() -> None:
             y_limits=ylim_bp_bn_ext,
             train_overlay_df=train_overlay,
         )
-
-    # --- Steel4: best row per specimen within Steel4 metrics; montages under ``steel4/``.
-    if best_s4.empty:
-        print(
-            "Steel4: no successful metrics rows (steel_model=steel4) after merge and finite-parameter "
-            "filters for the requested --sets; skip steel4/ plots. "
-            "Typical causes: --sets omitted Steel4 set_id values (use default 'all' or e.g. 1-12), "
-            "or Steel4 columns in optimized_brb_parameters.csv are non-finite."
-        )
-    else:
-            names_s4 = _legend_name_order(
-                catalog, set(best_s4["Name"].astype(str).tolist())
-            )
-            train_df_s4 = _build_frame_for_names_steel4(catalog, best_s4, names_s4, apparent)
-            if train_df_s4.empty:
-                print("Steel4 frame empty after geometry merge; skip steel4/ plots.")
-            else:
-                train_legend_s4 = _legend_name_order(
-                    catalog, set(train_df_s4["Name"].astype(str).tolist())
-                )
-
-                steel4_specs: list[tuple[str, str, str]] = [
-                    ("R0", r"$R_0$ [-]", "individual_optimal_R0_vs_geometry.png"),
-                    ("cR1", r"$c_{R1}$ [-]", "individual_optimal_cR1_vs_geometry.png"),
-                    ("cR2", r"$c_{R2}$ [-]", "individual_optimal_cR2_vs_geometry.png"),
-                    (
-                        _R0_1_MINUS_CR1_COL,
-                        r"$R_0(1-c_{R1})$ [-]",
-                        "individual_optimal_R0_1_minus_cR1_vs_geometry.png",
-                    ),
-                    ("b_ip", r"$b_{ip}$ [-]", "individual_optimal_b_ip_vs_geometry.png"),
-                    ("b_lp", r"$b_{lp}$ [-]", "individual_optimal_b_lp_vs_geometry.png"),
-                    ("b_ic", r"$b_{ic}$ [-]", "individual_optimal_b_ic_vs_geometry.png"),
-                    ("b_lc", r"$b_{lc}$ [-]", "individual_optimal_b_lc_vs_geometry.png"),
-                    ("rho_ip", r"$\rho_{ip}$ [-]", "individual_optimal_rho_ip_vs_geometry.png"),
-                    ("rho_ic", r"$\rho_{ic}$ [-]", "individual_optimal_rho_ic_vs_geometry.png"),
-                    ("R_i", r"$R_i$ [-]", "individual_optimal_R_i_vs_geometry.png"),
-                    ("l_yp", r"$l_{yp}$ [-]", "individual_optimal_l_yp_vs_geometry.png"),
-                ]
-
-                for col, ylab, fname in steel4_specs:
-                    _montage_scatter(
-                        train_df_s4,
-                        col,
-                        ylab,
-                        steel4_dir / fname,
-                        name_to_color=name_to_color,
-                        legend_names=train_legend_s4,
-                        relaxed_y_limits=True,
-                    )
-
-                _montage_scatter(
-                    train_df_s4,
-                    "b_p",
-                    r"$b_p$ [-]",
-                    steel4_dir / "individual_optimal_bp_vs_geometry.png",
-                    name_to_color=name_to_color,
-                    legend_names=train_legend_s4,
-                    relaxed_y_limits=True,
-                )
-                _montage_scatter(
-                    train_df_s4,
-                    "b_n",
-                    r"$b_n$ [-]",
-                    steel4_dir / "individual_optimal_bn_vs_geometry.png",
-                    name_to_color=name_to_color,
-                    legend_names=train_legend_s4,
-                    relaxed_y_limits=True,
-                )
-
-                train_overlay_s4 = train_df_s4[
-                    train_df_s4["Name"].astype(str).isin(gw_pos)
-                ].copy()
-                overlay_s4 = (
-                    train_overlay_s4 if not train_overlay_s4.empty else train_df_s4
-                )
-
-                ext_df_s4 = _extended_bp_bn_frame_steel4(catalog, best_s4, apparent)
-                if not ext_df_s4.empty:
-                    ext_legend_s4 = _legend_name_order(
-                        catalog, set(ext_df_s4["Name"].astype(str).tolist())
-                    )
-                    _montage_scatter(
-                        ext_df_s4,
-                        "b_p",
-                        r"$b_p$ [-]",
-                        steel4_dir / "individual_optimal_bp_vs_geometry_extended.png",
-                        name_to_color=name_to_color,
-                        legend_names=ext_legend_s4,
-                        square_marker_names=digitized_unordered,
-                        relaxed_y_limits=True,
-                        train_overlay_df=overlay_s4,
-                    )
-                    _montage_scatter(
-                        ext_df_s4,
-                        "b_n",
-                        r"$b_n$ [-]",
-                        steel4_dir / "individual_optimal_bn_vs_geometry_extended.png",
-                        name_to_color=name_to_color,
-                        legend_names=ext_legend_s4,
-                        square_marker_names=digitized_unordered,
-                        relaxed_y_limits=True,
-                        train_overlay_df=overlay_s4,
-                    )
 
 
 if __name__ == "__main__":

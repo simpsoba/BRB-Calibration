@@ -1,30 +1,14 @@
 """
-Calibrate and plot one specimen using ``input.csv`` in this folder (SteelMPF only).
+Calibrate one specimen with SteelMPF (seeds/bounds/loss in ``input.csv``).
 
-Reads brace geometry and nominal yield from ``config/calibration/BRB-Specimens.csv``.
-SteelMPF seeds, optimizer bounds, and loss weights come from ``input.csv`` (default:
-``scripts/calibrate_single/input.csv``; ``steel.b_p`` / ``steel.b_n`` are numeric literals or
-apparent-``b`` stat keywords). ``meta.set_id`` may list multiple ids (comma-separated); other rows
-then supply one value per set_id (quoted fields may contain commas). Experimental F-u from
-``--force-deformation``.
+Geometry and fy from ``config/calibration/BRB-Specimens.csv``. Default ``input.csv`` has one
+``set_id``. From the repo root::
 
-Typical (from repository root)::
+    python scripts/calibrate_single/calibrate_one_specimen.py STF01 --prepare-data --metric l2
 
-    python scripts/calibrate_single/calibrate_one_specimen.py STF01
-
-Use ``--replot`` to regenerate overlay PNGs from an existing ``parameters.csv`` without
-re-running L-BFGS-B optimization.
-
-Omit ``--force-deformation`` to use ``data/resampled/{Name}/force_deformation.csv`` when it exists.
-With ``--prepare-data``, raw data must live under ``data/raw/{Name}/``; postprocess writes the
-standard filtered/resampled tree, then calibration reads the resampled CSV (created if missing).
-
-Apparent ``b_p`` / ``b_n`` diagnostics (slope overlays + segment histograms) are written under
-``results/plots/calibration/single_specimen/{Name}/apparent_b/``.
-
-Cycle partitioning, landmark overlays, cycle-weight maps, and per-cycle energy panels are written
-under ``.../single_specimen/{Name}/cycles/`` (same figures as ``plot_cycle_landmarks_debug.py`` and
-``plot_cycle_energy_debug.py`` in the main pipeline).
+Outputs: ``results/calibration/single_specimen/{Name}/parameters.csv`` and overlay PNGs under
+``results/plots/calibration/single_specimen/{Name}/``. Use ``--debug-plots`` for apparent-b and
+cycle diagnostics. ``--replot`` regenerates overlays from a saved ``parameters.csv``.
 """
 from __future__ import annotations
 
@@ -209,19 +193,13 @@ def _plot_cycle_debug(
     set_id: int,
     D_exp: np.ndarray,
     F_exp: np.ndarray,
-    F_sim: np.ndarray,
     amp_meta: list[dict],
     pointwise_weights: np.ndarray,
-    prow: pd.Series,
     cat_row: pd.Series,
     *,
     plots_base: Path,
 ) -> None:
-    """Cycle weights, J_feat landmarks, and per-cycle energy panels (path-ordered specimens only)."""
-    from calibrate.cycle_feature_loss import LANDMARK_EXP_CSV_COLUMNS  # noqa: E402
-    from calibrate.plot_cycle_energy_debug import plot_specimen_cycles  # noqa: E402
-    from calibrate.plot_cycle_landmarks_debug import plot_landmark_overlay  # noqa: E402
-
+    """Cycle-weight hysteresis map (path-ordered specimens only)."""
     cycles_dir = plots_base / "cycles"
     cycles_dir.mkdir(parents=True, exist_ok=True)
     f_yc = float(cat_row["f_yc_ksi"])
@@ -241,45 +219,6 @@ def _plot_cycle_debug(
         L_y=L_y,
     )
     print(f"  Wrote cycle weights: {cycles_dir / f'{specimen}_set{set_id}_cycle_weights.png'}")
-
-    landmarks_png = cycles_dir / f"{specimen}_set{set_id}_landmarks.png"
-    exp_csv_rows: list[dict] = []
-    plot_landmark_overlay(
-        specimen,
-        set_id,
-        D_exp,
-        F_exp,
-        F_sim,
-        amp_meta,
-        prow,
-        landmarks_png,
-        f_yc=f_yc,
-        A_c=A_c,
-        L_y=L_y,
-        exp_csv_rows=exp_csv_rows,
-    )
-    print(f"  Wrote landmarks: {landmarks_png}")
-    if exp_csv_rows:
-        landmarks_csv = cycles_dir / f"{specimen}_set{set_id}_landmarks_exp.csv"
-        pd.DataFrame(exp_csv_rows).reindex(columns=LANDMARK_EXP_CSV_COLUMNS).to_csv(
-            landmarks_csv, index=False
-        )
-        print(f"  Wrote landmarks CSV: {landmarks_csv}")
-
-    energy_png = cycles_dir / f"{specimen}_set{set_id}_cycle_energy_debug.png"
-    plot_specimen_cycles(
-        specimen,
-        set_id,
-        D_exp,
-        F_exp,
-        F_sim,
-        amp_meta,
-        energy_png,
-        f_yc=f_yc,
-        A_c=A_c,
-        L_y=L_y,
-    )
-    print(f"  Wrote cycle energy: {energy_png}")
 
 
 def _parameter_row(
@@ -331,10 +270,14 @@ def _validate_specimen(specimen: str) -> tuple[pd.DataFrame, pd.Series]:
 
 
 def _resolve_force_deformation_path(path: Path) -> Path:
-    resolved = path.expanduser().resolve()
-    if not resolved.is_absolute():
-        raise SystemExit(f"--force-deformation must be an absolute path; got {path!r}")
-    return resolved
+    p = path.expanduser()
+    if not p.is_absolute():
+        p = (_PROJECT_ROOT / p).resolve()
+    else:
+        p = p.resolve()
+    if not p.is_file():
+        raise SystemExit(f"force_deformation CSV not found: {p}")
+    return p
 
 
 def _default_force_deformation_path(specimen: str, *, prepare_data: bool) -> Path:
@@ -402,13 +345,63 @@ def _cycle_points_for_csv(specimen: str, df: pd.DataFrame) -> list[dict]:
     return find_cycle_points(df)[0]
 
 
+def _apply_metric_override(loss: CalibrationLossSettings, metric: str | None) -> CalibrationLossSettings:
+    """Map ``--metric l1|l2`` onto feature loss weights (energy/binenv unchanged)."""
+    if metric is None:
+        return loss
+    m = metric.strip().lower()
+    if m == "l2":
+        return CalibrationLossSettings(
+            w_feat_l2=1.0,
+            w_feat_l1=0.0,
+            w_energy_l2=loss.w_energy_l2,
+            w_energy_l1=loss.w_energy_l1,
+            w_unordered_binenv_l2=loss.w_unordered_binenv_l2,
+            w_unordered_binenv_l1=loss.w_unordered_binenv_l1,
+            use_amplitude_weights=loss.use_amplitude_weights,
+            amplitude_weight_power=loss.amplitude_weight_power,
+            amplitude_weight_eps=loss.amplitude_weight_eps,
+        )
+    if m == "l1":
+        return CalibrationLossSettings(
+            w_feat_l2=0.0,
+            w_feat_l1=1.0,
+            w_energy_l2=loss.w_energy_l2,
+            w_energy_l1=loss.w_energy_l1,
+            w_unordered_binenv_l2=loss.w_unordered_binenv_l2,
+            w_unordered_binenv_l1=loss.w_unordered_binenv_l1,
+            use_amplitude_weights=loss.use_amplitude_weights,
+            amplitude_weight_power=loss.amplitude_weight_power,
+            amplitude_weight_eps=loss.amplitude_weight_eps,
+        )
+    raise ValueError(f"metric must be 'l1' or 'l2'; got {metric!r}")
+
+
+def _print_optimized_params(out_row: pd.Series, active: list[str], jtot: float) -> None:
+    keys = ["fyp", "fyn", "E", "b_p", "b_n", "R0", "cR1", "cR2", "a1", "a2", "a3", "a4"]
+    parts = []
+    for k in keys:
+        if k not in out_row.index:
+            continue
+        try:
+            v = float(out_row[k])
+        except (TypeError, ValueError):
+            continue
+        mark = "*" if k in active else ""
+        parts.append(f"{k}{mark}={v:.6g}")
+    print(f"  Best-fit SteelMPF (*=optimized):  {', '.join(parts)}")
+    print(f"  final_J_total = {jtot:.6g}")
+
+
 def calibrate_and_plot(
     specimen: str,
     force_deformation_csv: Path,
     cfg: SingleCalibrateInput,
     *,
     prepare_data: bool = False,
-    plot_apparent_b: bool = True,
+    plot_apparent_b: bool = False,
+    debug_plots: bool = False,
+    metric: str | None = None,
     out_dir: Path | None = None,
     plots_dir: Path | None = None,
     use_amplitude_weights: bool | None = None,
@@ -417,9 +410,10 @@ def calibrate_and_plot(
 ) -> CalibrateRunContext:
     catalog, cat_row = _validate_specimen(specimen)
 
-    csv_path = _resolve_force_deformation_path(force_deformation_csv)
+    # Prepare first so --prepare-data works from a clean data/resampled tree.
     if prepare_data:
         _prepare_specimen_data(specimen, e_ksi=float(cfg.steel_seeds["E"]))
+    csv_path = _resolve_force_deformation_path(force_deformation_csv)
 
     df = _load_force_deformation_csv(csv_path)
     print(f"  Using force-deformation: {csv_path}")
@@ -446,22 +440,22 @@ def calibrate_and_plot(
     )
 
     overlay_dir = plots_dir or (PLOTS_SINGLE / specimen)
-    if plot_apparent_b:
+    if plot_apparent_b and debug_plots:
         _plot_apparent_b(specimen, cat_row, plots_base=overlay_dir)
 
     prow = _parameter_row(specimen, cat_row, cfg, b_p=b_p, b_n=b_n)
-    loss = cfg.loss
+    loss = _apply_metric_override(cfg.loss, metric)
     if use_amplitude_weights is not None:
         loss = CalibrationLossSettings(
-            w_feat_l2=cfg.loss.w_feat_l2,
-            w_feat_l1=cfg.loss.w_feat_l1,
-            w_energy_l2=cfg.loss.w_energy_l2,
-            w_energy_l1=cfg.loss.w_energy_l1,
-            w_unordered_binenv_l2=cfg.loss.w_unordered_binenv_l2,
-            w_unordered_binenv_l1=cfg.loss.w_unordered_binenv_l1,
+            w_feat_l2=loss.w_feat_l2,
+            w_feat_l1=loss.w_feat_l1,
+            w_energy_l2=loss.w_energy_l2,
+            w_energy_l1=loss.w_energy_l1,
+            w_unordered_binenv_l2=loss.w_unordered_binenv_l2,
+            w_unordered_binenv_l1=loss.w_unordered_binenv_l1,
             use_amplitude_weights=use_amplitude_weights,
-            amplitude_weight_power=cfg.loss.amplitude_weight_power,
-            amplitude_weight_eps=cfg.loss.amplitude_weight_eps,
+            amplitude_weight_power=loss.amplitude_weight_power,
+            amplitude_weight_eps=loss.amplitude_weight_eps,
         )
 
     active = list(cfg.optimize_params)
@@ -551,29 +545,25 @@ def calibrate_and_plot(
         )
 
     jtot = mf["final_J_total"]
-    print(
-        f"  {specimen} set {cfg.set_id}: J_total={jtot:.6g}  "
-        f"J_feat_L2={mf['final_J_feat_raw']:.6g}"
-    )
+    _print_optimized_params(out_row, active, jtot)
 
     overlay_dir.mkdir(parents=True, exist_ok=True)
 
-    catalog = read_catalog()
-    if not uses_unordered_inputs(get_specimen_record(specimen, catalog)):
-        _plot_cycle_debug(
-            specimen,
-            int(cfg.set_id),
-            D_exp,
-            F_exp,
-            np.asarray(F_sim_final, dtype=float),
-            amp_meta,
-            mse_weights,
-            out_row,
-            cat_row,
-            plots_base=overlay_dir,
-        )
-    else:
-        print(f"  Skipped cycle/landmark debug (digitized unordered specimen {specimen!r})")
+    if debug_plots:
+        catalog = read_catalog()
+        if not uses_unordered_inputs(get_specimen_record(specimen, catalog)):
+            _plot_cycle_debug(
+                specimen,
+                int(cfg.set_id),
+                D_exp,
+                F_exp,
+                amp_meta,
+                mse_weights,
+                cat_row,
+                plots_base=overlay_dir,
+            )
+        else:
+            print(f"  Skipped cycle debug (digitized unordered specimen {specimen!r})")
 
     return CalibrateRunContext(
         specimen_out=specimen_out,
@@ -621,8 +611,8 @@ def replot_from_saved(
         cat_row,
         overlay_dir,
         norm_xy_half=None,
-        override_bp=None,
-        override_bn=None,
+        override_b_p=None,
+        override_b_n=None,
         force_deformation_csv=csv_path,
     )
     print(f"  Wrote overlays under {overlay_dir}")
@@ -650,7 +640,7 @@ def replot_from_saved(
 def main() -> None:
     p = argparse.ArgumentParser(
         description=(
-            "Individual L-BFGS-B calibration + overlays for one specimen (SteelMPF). "
+            "Calibrate one specimen (SteelMPF) and write best-fit params + overlay plots. "
             "Edit scripts/calibrate_single/input.csv for seeds, bounds, and loss weights."
         ),
     )
@@ -673,9 +663,8 @@ def main() -> None:
         default=None,
         metavar="PATH",
         help=(
-            "Absolute path to force_deformation.csv (default: "
-            "data/resampled/{Name}/force_deformation.csv when present; "
-            "with --prepare-data, that path is created if missing)."
+            "Path to force_deformation.csv (relative to repo root or absolute). "
+            "Default: data/resampled/{Name}/force_deformation.csv."
         ),
     )
     p.add_argument(
@@ -685,20 +674,25 @@ def main() -> None:
         help=f"Calibration input CSV (default: {DEFAULT_INPUT})",
     )
     p.add_argument(
+        "--metric",
+        choices=("l1", "l2"),
+        default=None,
+        help="Feature loss norm: l2 (w_feat_l2=1) or l1 (w_feat_l1=1). Overrides input.csv feature weights.",
+    )
+    p.add_argument(
+        "--debug-plots",
+        action="store_true",
+        help="Write apparent-b and cycle/landmark debug figures under the plots folder.",
+    )
+    p.add_argument(
         "--replot",
         action="store_true",
-        help=(
-            "Skip optimization; reload parameters.csv from --out-dir and regenerate "
-            "force–deformation overlays and all-set grid PNGs."
-        ),
+        help="Skip optimization; reload parameters.csv and regenerate overlays.",
     )
     p.add_argument(
         "--prepare-data",
         action="store_true",
-        help=(
-            "Run cycle_points, filter_force, and resample_filtered for the specimen first "
-            "(requires data/raw/{Name}/). Then read the resampled force_deformation.csv."
-        ),
+        help="Run postprocess from data/raw/{Name}/ before calibrating.",
     )
     p.add_argument(
         "--out-dir",
@@ -763,6 +757,8 @@ def main() -> None:
                 cfg,
                 prepare_data=prepare_data and i == 0,
                 plot_apparent_b=(i == 0),
+                debug_plots=bool(args.debug_plots),
+                metric=args.metric,
                 out_dir=args.out_dir,
                 plots_dir=args.plots_dir,
                 use_amplitude_weights=args.amplitude_weights,
@@ -784,8 +780,8 @@ def main() -> None:
             run_ctx.cat_row,
             run_ctx.overlay_dir,
             norm_xy_half=None,
-            override_bp=None,
-            override_bn=None,
+            override_b_p=None,
+            override_b_n=None,
             force_deformation_csv=run_ctx.csv_path,
         )
         print(f"  Wrote overlays under {run_ctx.overlay_dir}")
@@ -804,21 +800,14 @@ def main() -> None:
 
     out_dir = run_ctx.specimen_out
     plots_dir = args.plots_dir or (PLOTS_SINGLE / specimen)
-    force_resolved = force_csv.expanduser().resolve()
     params_path = out_dir / "parameters.csv"
     print(
         f"\nDone: {specimen}\n"
-        f"  Input:      {input_path if not args.replot else '(replot — input.csv not used)'}\n"
-        f"  Force-u:    {force_resolved}\n"
         f"  Parameters: {params_path}\n"
         f"  Metrics:    {out_dir / 'parameters_metrics.csv'}\n"
-        f"  Sim CSV:    {out_dir / 'parameters_simulated_force'}\n"
-        f"  Overlays:   {plots_dir}\n"
-        f"  All sets:   {plots_dir / f'{specimen}_all_sets_force_def.png'}\n"
-        f"              {plots_dir / f'{specimen}_all_sets_force_def_norm.png'}\n"
-        f"  Params:     {plots_dir / f'{specimen}_setALL_params.txt'}\n"
-        f"  Apparent b: {plots_dir / 'apparent_b'}\n"
-        f"  Cycles:     {plots_dir / 'cycles'}"
+        f"  Overlay:    {plots_dir / f'{specimen}_set1_force_def_norm.png'} "
+        f"(and other set_id overlays if multiple)\n"
+        f"  Plots dir:  {plots_dir}"
     )
 
 

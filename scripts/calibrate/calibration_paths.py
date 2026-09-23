@@ -23,8 +23,7 @@ SET_ID_SETTINGS_GENERALIZED_CSV = CALIBRATION_CONFIG_DIR / "set_id_settings_gene
 
 # Human-readable / tabular summaries (not raw inputs or per-run metrics blobs).
 SUMMARY_STATISTICS_DIR = _PROJECT_ROOT / "summary_statistics"
-# Default index / single-model stem. With multiple ``steel_model`` values (``steelmpf``, ``steel4``), see
-# ``calibration_parameter_summary_<steel_model>.md`` and ``*_generalized.csv`` siblings.
+# Default Markdown/CSV stems for SteelMPF calibration summaries.
 CALIBRATION_PARAMETER_SUMMARY_MD = SUMMARY_STATISTICS_DIR / "calibration_parameter_summary.md"
 CALIBRATION_PARAMETER_SUMMARY_GENERALIZED_CSV = (
     SUMMARY_STATISTICS_DIR / "calibration_parameter_summary_generalized.csv"

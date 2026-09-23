@@ -136,13 +136,9 @@ from calibrate.set_id_settings import (  # noqa: E402
 )
 from calibrate.steel_model import (  # noqa: E402
     SHARED_STEEL_KEYS,
-    STEEL4_ISO_KEYS,
-    STEEL_MODEL_STEEL4,
-    STEEL_MODEL_STEELMPF,
     STEELMPF_ISO_KEYS,
     normalize_steel_model,
     sim_param_keys_for_model,
-    sync_steel4_isotropic_slopes_in_output_row,
 )
 from calibrate.specimen_weights import (  # noqa: E402
     catalog_metrics_fields,
@@ -608,13 +604,9 @@ def main() -> None:
         return bounds_cache[key]
 
     def _seed_keys_for_sm(sm: object) -> frozenset[str]:
-        sm_n = normalize_steel_model(sm)
+        normalize_steel_model(sm)
         bn = ("b_p", "b_n")
-        if sm_n == STEEL_MODEL_STEELMPF:
-            return frozenset((*SHARED_STEEL_KEYS, *bn, *STEELMPF_ISO_KEYS))
-        if sm_n == STEEL_MODEL_STEEL4:
-            return frozenset((*SHARED_STEEL_KEYS, *bn, *STEEL4_ISO_KEYS))
-        return frozenset((*SHARED_STEEL_KEYS, *bn))
+        return frozenset((*SHARED_STEEL_KEYS, *bn, *STEELMPF_ISO_KEYS))
 
     def _overlay_parent_on_settings_row(
         settings_row: pd.Series,
@@ -1409,7 +1401,6 @@ def main() -> None:
                 frozenset(active_for_param_merge),
             )
             restore_individual_bp_bn(merged_out, base, skip=joint_skip)
-            sync_steel4_isotropic_slopes_in_output_row(merged_out)
             specimen_set_param_rows.append(merged_out.to_dict())
     p_df = pd.DataFrame(specimen_set_param_rows)
     out_param_cols = list(orig_param_columns)

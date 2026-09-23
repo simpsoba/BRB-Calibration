@@ -10,7 +10,7 @@
 #                          specimen_apparent_bn_bp.csv, calibration reports, …)
 #   summary_statistics/
 #
-# Does not remove docs/readme snapshots, run_snapshots/, or repo-root demo PNGs.
+# Does not remove docs/readme snapshots or run_snapshots/.
 # Run from repo root: ./clean_outputs.sh
 
 set -euo pipefail

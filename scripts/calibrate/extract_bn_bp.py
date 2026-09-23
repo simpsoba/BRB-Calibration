@@ -1,40 +1,7 @@
-"""
-Extract b_n and b_p per specimen from resampled force-deformation data using
-cycle points. **Path-ordered** apparent ``b`` uses opposite-peak-to-peak branches
-(``_segments_opposite_peak_to_peak``). Plastic **b-fit start** on each branch uses
-``_plastic_onset_index_yield_deform_frac_to_peak_force``: first ``F`` past ``\\pm f_y A_{sc}`` in the
-loading sense; then the first index at which ``F`` reaches its branch extremum after yield (max for
-C→T, min for T→C); then ``u_{\\mathrm{level}} = u_{\\mathrm{yield}} + (1-r)\\,(u_{\\mathrm{peak\\,F}}-u_{\\mathrm{yield}})``
-with ``r =`` ``B_PLASTIC_ONSET_DEFORM_FRAC_REMAINING_TO_PEAK_F`` (default ``0.75``), i.e. **75% of the
-yield→peak-``F`` deformation span is still ahead** at the b-fit start. First sample from yield onward
-whose ``u`` has reached or passed ``u_{\\mathrm{level}}`` (by ``\\ge`` / ``\\le`` along signed ``du``).
-If that fails, legacy ``|F|`` threshold onset applies.
-``k_{\\mathrm{init}} = \\hat{E}A_{sc}/L_T`` for normalizing ``b``.
-From that onset through a **trimmed** end along the **same** yield→peak-``F`` deformation ``du`` as the onset
-rule: last sample with ``u`` no past ``u_{\\mathrm{yield}} + f_{\\mathrm{end}}\\,du`` where
-``f_{\\mathrm{end}} =`` ``B_PLASTIC_FIT_DEFORM_FRAC_YIELD_TO_PEAK_F`` (default ``0.99``), paralleling
-``(1-r)`` at the start with ``r =`` ``B_PLASTIC_ONSET_DEFORM_FRAC_REMAINING_TO_PEAK_F``. Legacy onset still
-fits to the full segment ``end``. Apparent $b$ is a **linear fit** to $(u,F)$ constrained through onset,
-divided by $k_{\\mathrm{init}}$ (see ``_plastic_region_fit``).
-Aggregate
-per specimen as mean and median. Save catalog-like CSV with Q, E_hat, and
-computed parameters (no optimization). Default output:
-``results/calibration/specimen_apparent_bn_bp.csv`` (path-ordered rows from ``data/resampled``;
-digitized scatter-cloud rows from envelope fit, **mean** only--median/quartiles **NaN**).
-Legacy plastic onset (fallback only for path-ordered data) uses ``|F| >= PLASTIC_STRESS_RATIO_FY * f_y A_sc``
-(landmark loss uses ``f_y A_sc`` without this ratio; apparent-b extraction keeps 1.1 here.)
-Input resampled: ``data/resampled/{Name}/force_deformation.csv``. Scatter: filtered cloud if present else raw.
-``get_b_and_amplitude_lists_one_specimen`` returns segment-level ``b`` lists paired with plastic-fit amplitudes (for plots).
-Every opposite-peak-to-peak half-cycle with a valid plastic fit is included; then segment ``b_p`` / ``b_n`` values
-outside ``[\\max(0, Q1 - k\\,\\mathrm{IQR}),\\, Q3 + k\\,\\mathrm{IQR}]`` (``k =`` ``APPARENT_B_IQR_MULTIPLIER``, default 3.0)
-are dropped **separately by loading direction** before aggregates and downstream plots.
-Individual plastic fits already reject non-finite or non-positive ``b`` (``b \\le 0``); the IQR window also floors at 0.
-``get_b_segment_scatter_metrics_one_specimen`` adds plastic strain and cumulative $x$ columns at segment peaks
-(plus prior **maximum** opposite-direction deformation on the resampled prefix before each zero-to-peak segment for the plastic-opp abscissa), $P/(f_y A_{sc})$ at plastic line $\\cap$ $F=k_{\\mathrm{init}}u$ from the origin,
-and $\\sigma_0/f_y$ using the same latest opposite peak before plastic onset, plus $\\sigma_0^{\\mathrm{eq}}/f_y$
-from each plastic line intersected with the elastic asymptote from **global** max compressive / tensile deformation;
-``iter_sig0_overlay_segments`` supports
-``sig0_slopes`` diagnostic figures. ``get_unordered_envelope_xmetrics_one_specimen`` gives single-point $x$ for extended unordered figures (including prior-opp plastic at $\\arg\\max|\\delta|$).
+"""Extract apparent b_n and b_p from resampled force–deformation (path-ordered and digitized).
+
+Writes ``results/calibration/specimen_apparent_bn_bp.csv`` for seeding ``set_id_settings.csv``.
+Plastic-region fits use yield→peak deformation fractions (see constants near the top of this file).
 """
 from __future__ import annotations
 
@@ -53,7 +20,7 @@ sys.path.insert(0, str(_SCRIPTS))
 from calibration_paths import BRB_SPECIMENS_CSV, SPECIMEN_APPARENT_BN_BP_PATH  # noqa: E402
 from cycle_feature_loss import PLASTIC_STRESS_RATIO_FY  # noqa: E402
 from digitized_unordered_bn import compute_envelope_bn_unordered  # noqa: E402
-from model.corotruss import compute_Q
+from model.brace_geometry import compute_Q
 from postprocess.cycle_points import find_cycle_points, load_cycle_points_resampled
 from specimen_catalog import (  # noqa: E402
     force_deformation_unordered_csv_path,

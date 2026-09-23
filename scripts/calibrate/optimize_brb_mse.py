@@ -121,14 +121,9 @@ from calibrate.params_to_optimize import (  # noqa: E402
 )
 from calibrate.steel_model import (  # noqa: E402
     SHARED_STEEL_KEYS,
-    STEEL4_ISO_KEYS,
-    STEEL_MODEL_STEEL4,
-    STEEL_MODEL_STEELMPF,
     STEELMPF_ISO_KEYS,
-    clamp_steel4_isotropic_slopes,
     normalize_steel_model,
     sim_param_keys_for_model,
-    sync_steel4_isotropic_slopes_in_output_row,
 )
 from calibrate.set_id_optimize_params import (  # noqa: E402
     resolve_loss_settings_for_set_id,
@@ -362,7 +357,7 @@ def _row_to_sim_params(prow: pd.Series) -> dict[str, float]:
     """
     Build float kwargs for ``run_simulation`` (excludes ``steel_model``).
 
-    Keys are model-specific (SteelMPF through ``a4`` only; Steel4 adds ``-iso`` fields).
+    Keys are SteelMPF simulation parameters through ``a4``.
     Missing optional columns use ``SIM_PARAM_FILL_DEFAULTS``.
     """
     sm = normalize_steel_model(prow.get("steel_model"))
@@ -382,8 +377,6 @@ def run_simulation_kwargs_from_prow(prow: pd.Series) -> tuple[str, dict[str, flo
     """Normalized ``steel_model`` plus float kwargs for ``run_simulation``."""
     sm = normalize_steel_model(prow.get("steel_model"))
     kw = _row_to_sim_params(prow)
-    if sm == STEEL_MODEL_STEEL4:
-        kw = clamp_steel4_isotropic_slopes(kw)
     return sm, kw
 
 
@@ -396,8 +389,6 @@ def run_simulation_kwargs_from_prow_with_ties(
     """Like ``run_simulation_kwargs_from_prow`` but enforces ``set_id_settings`` param→param ties."""
     sm, kw = run_simulation_kwargs_from_prow(prow)
     apply_param_value_ties(kw, param_ties, optimized_param_names)
-    if sm == STEEL_MODEL_STEEL4:
-        kw = clamp_steel4_isotropic_slopes(kw)
     return sm, kw
 
 
@@ -684,7 +675,6 @@ def optimize_one_specimen(
     for name in params_to_optimize:
         out_row[name] = physical[name]
     sync_tied_columns_in_output_row(out_row, ties, opt_set)
-    sync_steel4_isotropic_slopes_in_output_row(out_row)
 
     F_sim_final: np.ndarray | None
     bd_final: LossBreakdown | None
@@ -1023,13 +1013,9 @@ def main() -> None:
         return bounds_cache[key]
 
     def _seed_keys_for_sm(sm: str) -> frozenset[str]:
-        sm_n = normalize_steel_model(sm)
+        normalize_steel_model(sm)
         bn = ("b_p", "b_n")
-        if sm_n == STEEL_MODEL_STEELMPF:
-            return frozenset((*SHARED_STEEL_KEYS, *bn, *STEELMPF_ISO_KEYS))
-        if sm_n == STEEL_MODEL_STEEL4:
-            return frozenset((*SHARED_STEEL_KEYS, *bn, *STEEL4_ISO_KEYS))
-        return frozenset((*SHARED_STEEL_KEYS, *bn))
+        return frozenset((*SHARED_STEEL_KEYS, *bn, *STEELMPF_ISO_KEYS))
 
     def _explicit_steel_cols_for_set_id(set_id: int) -> frozenset[str]:
         """Steel-param columns where the child's set_id_settings.csv row is non-blank/non--999.

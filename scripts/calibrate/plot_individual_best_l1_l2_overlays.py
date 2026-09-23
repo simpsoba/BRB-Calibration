@@ -16,7 +16,7 @@ Numerical histories are read from:
 ``results/calibration/individual_optimize/optimized_brb_parameters_simulated_force/{Name}_set{k}_simulated.csv``
 
 Outputs:
-- Under ``.../overlays_best_l1_l2/<steel_model>/`` (e.g. ``steelmpf/``, ``steel4/``): one PNG per specimen
+- Under ``.../overlays_best_l1_l2/steelmpf/``: one PNG per specimen
   ``{Name}_bestL2_bestL1_force_def_norm.png`` and combined ``all_bestL2_bestL1_force_def_norm.png``.
 - Best L1/L2 ``set_id`` are chosen **within** each ``steel_model`` (from ``optimized_brb_parameters.csv`` via ``set_id``).
 - Combined metrics CSV at ``overlays_best_l1_l2/bestL2_bestL1_metrics_table.csv`` includes a ``steel_model`` column.
@@ -48,10 +48,8 @@ from calibrate.calibration_paths import (  # noqa: E402
 )
 from calibrate.set_id_settings import read_set_id_settings_table  # noqa: E402
 from calibrate.steel_model import (  # noqa: E402
-    STEEL4_ISO_KEYS,
-    STEEL_MODEL_STEEL4,
+    STEEL_MODEL_STEELMPF,
     normalize_steel_model,
-    ordered_steel_model_subdirs,
 )
 from postprocess.plot_dimensions import (  # noqa: E402
     COLOR_NUMERICAL_COHORT,
@@ -221,7 +219,9 @@ def _set_id_to_steel_model(params_df: pd.DataFrame) -> dict[int, str]:
 
 
 def _models_in_order(models: set[str]) -> list[str]:
-    return ordered_steel_model_subdirs(models)
+    normalize_steel_model(None)
+    out = sorted(models) if models else [STEEL_MODEL_STEELMPF]
+    return [m for m in out if normalize_steel_model(m) == STEEL_MODEL_STEELMPF] or [STEEL_MODEL_STEELMPF]
 
 
 def _pick_best_set_ids(metrics_df: pd.DataFrame, *, steel_model: str | None = None) -> dict[str, dict[str, int]]:
@@ -879,13 +879,8 @@ def _render_best_l1_l2_overlays_for_model(
         "final_unordered_J_binenv",
         "final_unordered_J_binenv_l1",
     ]
-    sm_tab = normalize_steel_model(steel_model)
-    _pcore_shared = ["b_p", "b_n", "R0", "cR1", "cR2", "a1", "a2", "a3", "a4"]
-    _pcore_steelmpf_tail = ["a2", "a4"]
-    if sm_tab == STEEL_MODEL_STEEL4:
-        param_cols = [*_pcore_shared, *STEEL4_ISO_KEYS]
-    else:
-        param_cols = [*_pcore_shared, *_pcore_steelmpf_tail]
+    normalize_steel_model(steel_model)
+    param_cols = ["b_p", "b_n", "R0", "cR1", "cR2", "a1", "a2", "a3", "a4"]
     rows_out: list[dict] = []
 
     def _bp_bn_source_token_for_set(set_id: int) -> str:

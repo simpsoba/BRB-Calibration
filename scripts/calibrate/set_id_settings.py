@@ -5,7 +5,7 @@ Source of truth: ``config/calibration/set_id_settings.csv`` (one row per set_id)
 
 This file merges steel seeds / b_p,b_n sourcing and per-set optimize/loss settings into one CSV.
 
-**Parameter aliases (SteelMPF / Steel4 seed columns):** a cell may contain another column's
+**Parameter aliases (SteelMPF seed columns):** a cell may contain another column's
 canonical name (e.g. ``b_lc`` = ``b_ic``) instead of a number. That means the slave parameter
 tracks the master while the slave is **not** listed in ``optimize_params``. During optimization,
 if the slave **is** optimized, the alias is ignored (the optimizer owns the slave). Initial seeds
@@ -33,22 +33,15 @@ from calibrate.set_id_optimize_params import (
 )
 from calibrate.steel_model import (
     SHARED_STEEL_KEYS,
-    STEEL4_ISO_KEYS,
     STEELMPF_ISO_KEYS,
-    STEEL_MODEL_STEEL4,
-    STEEL_MODEL_STEELMPF,
     normalize_steel_model,
 )
 
 
-def _seed_columns_for_steel_model(steel_model: object) -> frozenset[str]:
-    """Numeric seed columns allowed in ``set_id_settings.csv`` for this material kind."""
-    sm = normalize_steel_model(steel_model)
-    if sm == STEEL_MODEL_STEELMPF:
-        return frozenset((*SHARED_STEEL_KEYS, *STEELMPF_ISO_KEYS))
-    if sm == STEEL_MODEL_STEEL4:
-        return frozenset((*SHARED_STEEL_KEYS, *STEEL4_ISO_KEYS))
-    raise ValueError(f"unexpected steel_model {steel_model!r}")
+def _seed_columns_for_steel_model(_steel_model: object = None) -> frozenset[str]:
+    """Numeric seed columns allowed in ``set_id_settings.csv`` (SteelMPF)."""
+    normalize_steel_model(_steel_model)
+    return frozenset((*SHARED_STEEL_KEYS, *STEELMPF_ISO_KEYS))
 
 
 def parse_param_alias_bindings_from_row(row: pd.Series, steel_model: object) -> dict[str, str]:
@@ -103,7 +96,7 @@ def apply_param_value_ties(
     """
     For each slave -> master alias, set ``kw[slave] = kw[master]`` if slave is **not** optimized.
 
-    Call after assembling simulation kwargs (and after any Steel4 slope clamps). Masters must
+    Call after assembling simulation kwargs. Masters must
     already be present in ``kw``.
     """
     for slave, master in ties.items():

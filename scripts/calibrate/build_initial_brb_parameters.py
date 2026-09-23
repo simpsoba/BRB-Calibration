@@ -2,13 +2,12 @@
 Build ``results/calibration/individual_optimize/initial_brb_parameters.csv`` from the specimen catalog and
 ``extract_bn_bp.py`` output.
 
-**SteelMPF** / **Steel4** seeds and apparent-**b** sourcing for each calibration ``set_id`` are read from
+**SteelMPF** seeds and apparent-**b** sourcing for each calibration ``set_id`` are read from
 ``config/calibration/set_id_settings.csv`` (unified per-``set_id`` config), unless
 ``--set-id-settings`` points elsewhere.
 
-``steel_model`` selects ``steelmpf`` or ``steel4``.
-The CSV is **wide**: kinematic columns ``E``, ``b_p``, ``b_n``, ``R0``, ``cR1``, ``cR2`` apply to all;
-``a1``–``a4`` for ``steelmpf``; ``b_ip`` … ``b_lc`` only for Steel4. Blank cells fall back to defaults.
+The CSV is **wide**: kinematic columns ``E``, ``b_p``, ``b_n``, ``R0``, ``cR1``, ``cR2``, and ``a1``–``a4``.
+Blank cells fall back to defaults.
 
 Geometry and ``fyp`` / ``fyn`` always come from the specimen catalog. Columns ``b_p`` and ``b_n`` are each
 either a **numeric** literal or a **stat name** (case-insensitive) referencing ``specimen_apparent_bn_bp.csv``:
@@ -49,9 +48,7 @@ from calibrate.set_id_settings import (  # noqa: E402
 from specimen_catalog import read_catalog  # noqa: E402
 from calibrate.steel_model import (  # noqa: E402
     SHARED_STEEL_KEYS,
-    STEEL4_ISO_KEYS,
     STEELMPF_ISO_KEYS,
-    STEEL_MODEL_STEEL4,
     STEEL_MODEL_STEELMPF,
     normalize_steel_model,
 )
@@ -65,7 +62,6 @@ NUMERIC_SEED_KEYS: tuple[str, ...] = (
     "b_p",
     "b_n",
     *STEELMPF_ISO_KEYS,
-    *STEEL4_ISO_KEYS,
 )
 
 STEEL_DEFAULT: dict[str, float] = {
@@ -77,14 +73,6 @@ STEEL_DEFAULT: dict[str, float] = {
     "a2": 1.0,
     "a3": 0.04,
     "a4": 1.0,
-    "b_ip": 0.01,
-    "rho_ip": 2.0,
-    "b_lp": 0.001,
-    "R_i": 20.0,
-    "l_yp": 0.01,
-    "b_ic": 0.01,
-    "rho_ic": 2.0,
-    "b_lc": 0.001,
     "b_p": 0.01,
     "b_n": 0.025,
 }
@@ -127,13 +115,9 @@ class InitialBrbSeedRow:
 
 
 def _override_keys_for_steel_model(steel_model: str) -> frozenset[str]:
-    sm = normalize_steel_model(steel_model)
+    normalize_steel_model(steel_model)
     bn = ("b_p", "b_n")
-    if sm == STEEL_MODEL_STEELMPF:
-        return frozenset((*SHARED_STEEL_KEYS, *bn, *STEELMPF_ISO_KEYS))
-    if sm == STEEL_MODEL_STEEL4:
-        return frozenset((*SHARED_STEEL_KEYS, *bn, *STEEL4_ISO_KEYS))
-    raise ValueError(f"Unknown steel_model {steel_model!r}")
+    return frozenset((*SHARED_STEEL_KEYS, *bn, *STEELMPF_ISO_KEYS))
 
 
 def _validate_steel_default(d: dict[str, float]) -> None:
@@ -667,7 +651,6 @@ OUT_COLS = [
     "a2",
     "a3",
     "a4",
-    *STEEL4_ISO_KEYS,
 ]
 
 
@@ -796,10 +779,8 @@ def build_initial_rows(
                         "(and on settings seeds where missing)."
                     )
 
-            # Always start from seed.steel_seed so all NUMERIC_SEED_KEYS are present (including
-            # iso keys for the *other* steel_model, which the writer below still references with
-            # safe defaults). Then layer: inherited (subset for target model) -> explicit overrides
-            # -> alias ties (slave follows master).
+            # Always start from seed.steel_seed so all NUMERIC_SEED_KEYS are present. Then layer:
+            # inherited (subset for target model) -> explicit overrides -> alias ties.
             steel = dict(seed.steel_seed)
             if inherited is not None:
                 steel.update(inherited)
@@ -838,8 +819,6 @@ def build_initial_rows(
                 "a3": steel["a3"],
                 "a4": steel["a4"],
             }
-            for k in STEEL4_ISO_KEYS:
-                row_d[k] = steel[k]
             rows_out.append(row_d)
     return rows_out
 

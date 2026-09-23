@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Iterator
 
 import matplotlib.pyplot as plt
@@ -151,7 +152,10 @@ def style_axes_spines_and_ticks(
 
 
 def configure_matplotlib_style() -> None:
-    """Apply consistent font sizes via rcParams (call after ``sns.set_theme()`` if using seaborn)."""
+    """Load ``config/figure.mplstyle`` then apply repo font/legend defaults."""
+    style_path = Path(__file__).resolve().parents[2] / "config" / "figure.mplstyle"
+    if style_path.is_file():
+        plt.style.use(str(style_path))
     plt.rcParams.update(
         {
             "font.size": PLOT_FONT_SIZE_PT,
@@ -159,15 +163,8 @@ def configure_matplotlib_style() -> None:
             "axes.labelsize": PLOT_FONT_SIZE_PT,
             "xtick.labelsize": PLOT_FONT_SIZE_PT,
             "ytick.labelsize": PLOT_FONT_SIZE_PT,
-            # Slightly below axis/tick size so legends read a bit lighter on the page.
             "legend.fontsize": PLOT_FONT_SIZE_PT - 0.75,
             "figure.titlesize": PLOT_FONT_SIZE_PT,
-            "xtick.top": True,
-            "ytick.right": True,
-            "xtick.direction": "in",
-            "ytick.direction": "in",
-            "xtick.major.width": AXES_SPINE_LINEWIDTH,
-            "ytick.major.width": AXES_SPINE_LINEWIDTH,
             "legend.labelspacing": LEGEND_LABELSPACING,
             "legend.columnspacing": LEGEND_COLUMNSPACING,
             "legend.handletextpad": LEGEND_HANDLETEXTPAD,

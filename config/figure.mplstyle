@@ -1,0 +1,37 @@
+# BRB-Calibration figure style (Baker / Communication by Design inspired)
+# Load via postprocess.plot_dimensions.configure_matplotlib_style()
+
+figure.autolayout: False
+savefig.bbox: tight
+savefig.transparent: False
+
+font.family: sans-serif
+font.sans-serif: Source Sans Pro, Arial, Helvetica, DejaVu Sans
+font.size: 9
+axes.labelsize: medium
+axes.titlesize: medium
+legend.fontsize: small
+xtick.labelsize: small
+ytick.labelsize: small
+
+axes.grid: True
+grid.alpha: 0.3
+grid.linestyle: -
+axes.edgecolor: black
+axes.linewidth: 1
+axes.spines.top: False
+axes.spines.right: False
+axes.axisbelow: True
+xtick.direction: in
+ytick.direction: in
+xtick.top: False
+ytick.right: False
+
+lines.linewidth: 1.5
+lines.markersize: 4
+
+axes.formatter.use_mathtext: True
+axes.formatter.limits: -3, 4
+
+# Colorblind-aware cycle (blue, orange, light blue, gold, maroon)
+axes.prop_cycle: cycler('color', ['385F96', 'CF5921', '9EB8DB', 'E7B800', '800000'])

@@ -17,7 +17,7 @@ Calibration report: narrative (specimens, seed sets, objective, analyses) plus t
 
 Example::
 
-    python scripts/calibrate/report_averaged_vs_generalized_metrics.py
+    python scripts/calibrate/report_individual_vs_generalized_metrics.py
 """
 
 from __future__ import annotations

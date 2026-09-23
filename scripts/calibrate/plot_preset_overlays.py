@@ -77,8 +77,8 @@ def _run_one_preset_batch(
         sim_dir,
         params_path_label=params_path,
         specimen=specimen,
-        override_bp=None,
-        override_bn=None,
+        override_b_p=None,
+        override_b_n=None,
         require_individual_optimize=require_individual_optimize,
         include_digitized_unordered=include_digitized_unordered,
     )

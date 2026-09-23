@@ -44,10 +44,18 @@ results/calibration/
 # Summary tables / rollups (report scripts + generalized optimize).
 summary_statistics/
 
-# config/test eval outputs (run_eval_params_metrics.py, etc.)
-config/test/overlays/
-config/test/simulated_force/
-config/test/params_eval_metrics.csv
+# Exploratory SteelMPF sweep outputs (folder removed; ignore if regenerated)
+config/steelmpf_param_sweeps/**/*.png
+demo_prepend_zero_bug.png
+
+# Bayesian calibration scratch outputs (keep bayesian/ scripts and README)
+bayesian/results.out
+bayesian/predicted_*.png
+bayesian/predicted_force.csv
+bayesian/calibration_data.csv
+bayesian/target_*.csv
+bayesian/data/landmark_cache.json
+bayesian/config/cycle_meta.json
 
 # Full pipeline zip snapshots (archive_pipeline_outputs.ps1 / .sh)
 run_snapshots/

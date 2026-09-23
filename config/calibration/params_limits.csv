@@ -1,9 +1,6 @@
-# Box limits for L-BFGS-B in optimize_brb_mse.py and optimize_generalized_brb_mse.py.
-# Repo root — calibrate.calibration_paths.PARAM_LIMITS_CSV; override with --param-limits on those scripts.
-# Columns: parameter, lower, upper. Names in PARAMS_TO_OPTIMIZE but omitted here are unbounded (-inf, inf).
-# Finite L < U uses internal z in [0,1] reparam (scripts/calibrate/lbfgsb_reparam.py).
-# SteelMPF: cR1/cR2 Filippou R-degradation (R -> R0(1-cR1) as plastic history grows; keep cR1 < 1 for R > 0).
-# cR2 > 0 (SteelMPF uses cR2 + ksi). R0 > 0 (floor 1 avoids numerically stiff limits for small stiffness ratios).
+# Box limits for L-BFGS-B (optimize_brb_mse.py / optimize_generalized_brb_mse.py).
+# Columns: parameter, lower, upper. Names in PARAMS_TO_OPTIMIZE but omitted here are unbounded.
+# Edit this file to change search bounds — do not edit optimizer source for routine changes.
 parameter,lower,upper
 b_p,0.0,0.05
 b_n,0.0,0.05
@@ -14,12 +11,3 @@ a1,0.0,0.2
 a2,0.0,5.0
 a3,0.0,0.2
 a4,0.0,5.0
-# Steel4 -iso (ratios / shape; tune as needed). Before simulation, b_lp <= b_ip and b_lc <= b_ic.
-b_ip,0.0,0.02
-b_ic,0.0,0.02
-rho_ip,0.5,2.5
-rho_ic,0.5,2.5
-b_lp,0.0,0.02
-b_lc,0.0,0.02
-R_i,1.0,20.0
-l_yp,0.0,10.0

@@ -268,8 +268,8 @@ def plot_all_sets_force_def_grid(
             catalog_row,
             specimen_id=specimen_id,
             set_id=set_id,
-            override_bp=None,
-            override_bn=None,
+            override_b_p=None,
+            override_b_n=None,
         )
         if sk is None:
             continue

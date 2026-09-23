@@ -6,7 +6,7 @@ and spaces removed) as a **whole**, so ``c r 1`` and ``c_r_1`` map to ``cR1``. I
 does not match, the segment is split on whitespace and each piece is normalized (so ``R0 cR1`` in one
 segment still works). Separate parameters should use commas when names contain spaces, e.g.
 ``R0, c r 1, a1``. Resolved lists use canonical names matching ``params_to_optimize.SIM_PARAMS_FROM_ROW``.
-Allowed tokens depend on ``steel_model`` (``steelmpf`` vs ``steel4``) for that ``set_id``.
+Allowed tokens are SteelMPF simulation parameters (see ``OPTIMIZABLE_SIM_PARAM_NAMES``).
 """
 from __future__ import annotations
 
@@ -22,14 +22,11 @@ from calibrate.calibration_loss_settings import (
     calibration_loss_settings_from_partial_dict,
 )
 from calibrate.steel_model import (
-    STEEL4_ISO_KEYS,
-    STEEL_MODEL_STEEL4,
     STEEL_MODEL_STEELMPF,
-    STEELMPF_ISO_KEYS,
     normalize_steel_model,
 )
 
-# Keys accepted in optimize_params cells (union over models; filtered per ``steel_model``).
+# Keys accepted in optimize_params cells (SteelMPF).
 OPTIMIZABLE_SIM_PARAM_NAMES: frozenset[str] = frozenset(
     (
         "L_T",
@@ -48,19 +45,14 @@ OPTIMIZABLE_SIM_PARAM_NAMES: frozenset[str] = frozenset(
         "a2",
         "a3",
         "a4",
-        *STEEL4_ISO_KEYS,
     )
 )
 
 
-def optimizable_names_for_steel_model(steel_model: object) -> frozenset[str]:
-    """Parameters allowed in ``optimize_params`` for this ``steel_model`` row."""
-    sm = normalize_steel_model(steel_model)
-    if sm == STEEL_MODEL_STEELMPF:
-        return OPTIMIZABLE_SIM_PARAM_NAMES - frozenset(STEEL4_ISO_KEYS)
-    if sm == STEEL_MODEL_STEEL4:
-        return OPTIMIZABLE_SIM_PARAM_NAMES - frozenset(STEELMPF_ISO_KEYS)
-    raise ValueError(f"unexpected steel_model {steel_model!r}")
+def optimizable_names_for_steel_model(_steel_model: object = None) -> frozenset[str]:
+    """Parameters allowed in ``optimize_params`` (SteelMPF only)."""
+    normalize_steel_model(_steel_model)
+    return OPTIMIZABLE_SIM_PARAM_NAMES
 
 
 def _normalize_optimize_token_key(token: str) -> str:

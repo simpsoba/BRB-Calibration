@@ -19,11 +19,11 @@ lbs = kips / 1000.0
 ksi = kips / inch**2
 psi = ksi / 1000.0
 
-A_r = 2.25 * inch**2
+A_sc = 2.25 * inch**2
 A_t = 5.625 * inch**2
-r_T = 250 * inch
-r_y = 175 * inch
-KF = compute_Q(r_T, r_y, A_r, A_t)
+L_T = 250 * inch
+L_y = 175 * inch
+Q = compute_Q(L_T, L_y, A_sc, A_t)
 
 E0 = 29000.0 * ksi
 fyp = 38.6 * ksi
@@ -67,14 +67,14 @@ def run_analysis(target_displacement=None):
 
     ops.node(1, 0.0, 0.0)
     ops.fix(1, 1, 1)
-    ops.node(2, r_T, 0.0)
+    ops.node(2, L_T, 0.0)
     ops.fix(2, 0, 1)
 
     mat_tag = 1
-    ops.uniaxialMaterial("SteelMPF", mat_tag, fyp, fyn, KF * E0, bp, bn, R0, cR1, cR2, a1, a2, a3, a4)
+    ops.uniaxialMaterial("SteelMPF", mat_tag, fyp, fyn, Q * E0, b_p, b_n, R0, cR1, cR2, a1, a2, a3, a4)
 
     ele_tag = 1
-    ops.element("corotTruss", ele_tag, 1, 2, A_r, mat_tag)
+    ops.element("corotTruss", ele_tag, 1, 2, A_sc, mat_tag)
 
     ops.timeSeries("Path", 1, "-dt", dt, "-values", *path_values, "-useLast")
     ops.pattern("Plain", 1, 1)

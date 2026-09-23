@@ -20,7 +20,7 @@ this script runs the corotruss model with SteelMPF and plots both:
 Plots are saved under ``results/plots/calibration/individual_optimize/<output_dir>`` (default
 ``overlays``). Use --params and --output-dir to compare different parameter sets.
 
-Optional ``--override-bp`` / ``--override-bn`` replace ``b_p`` / ``b_n`` for every simulation
+Optional ``--override-b-p`` / ``--override-b-n`` replace ``b_p`` / ``b_n`` for every simulation
 (e.g. preset overlays before L-BFGS).
 """
 from __future__ import annotations
@@ -109,8 +109,8 @@ def _path_ordered_sim_kwargs(
     *,
     specimen_id: str,
     set_id: object,
-    override_bp: float | None,
-    override_bn: float | None,
+    override_b_p: float | None,
+    override_b_n: float | None,
 ) -> tuple[str, dict[str, float]] | None:
     """
     ``(steel_model, kwargs)`` for ``run_simulation`` (float block from ``SIM_PARAMS_FROM_ROW``).
@@ -127,10 +127,10 @@ def _path_ordered_sim_kwargs(
         return None
     if "L_y" not in prow.index or pd.isna(prow.get("L_y")):
         sim_kw["L_y"] = float(catalog_row["L_y_in"])
-    if override_bp is not None:
-        sim_kw["b_p"] = float(override_bp)
-    if override_bn is not None:
-        sim_kw["b_n"] = float(override_bn)
+    if override_b_p is not None:
+        sim_kw["b_p"] = float(override_b_p)
+    if override_b_n is not None:
+        sim_kw["b_n"] = float(override_b_n)
     return sm, sim_kw
 
 
@@ -736,8 +736,8 @@ def run_one_specimen(
     out_dir: Path,
     *,
     norm_xy_half: tuple[float, float] | None = None,
-    override_bp: float | None = None,
-    override_bn: float | None = None,
+    override_b_p: float | None = None,
+    override_b_n: float | None = None,
     force_deformation_csv: Path | None = None,
 ) -> None:
     """Run simulation and plot overlays for one specimen (possibly multiple parameter sets)."""
@@ -774,8 +774,8 @@ def run_one_specimen(
             catalog_row,
             specimen_id=specimen_id,
             set_id=set_id,
-            override_bp=override_bp,
-            override_bn=override_bn,
+            override_b_p=override_b_p,
+            override_b_n=override_b_n,
         )
         if sk is None:
             continue
@@ -854,8 +854,8 @@ def write_one_specimen_simulated_csvs(
     catalog_row: pd.Series,
     sim_dir: Path,
     *,
-    override_bp: float | None = None,
-    override_bn: float | None = None,
+    override_b_p: float | None = None,
+    override_b_n: float | None = None,
 ) -> int:
     """Run simulations and write ``{{Name}}_set{{k}}_simulated.csv`` only (no PNGs). Returns write count."""
     from calibrate.optimize_brb_mse import save_simulated_force_history_csv
@@ -888,8 +888,8 @@ def write_one_specimen_simulated_csvs(
             catalog_row,
             specimen_id=specimen_id,
             set_id=set_id,
-            override_bp=override_bp,
-            override_bn=override_bn,
+            override_b_p=override_b_p,
+            override_b_n=override_b_n,
         )
         if sk is None:
             continue
@@ -973,8 +973,8 @@ def run_multi_specimen_simulated_csvs(
     *,
     params_path_label: str | Path = "parameters",
     specimen: str | None = None,
-    override_bp: float | None = None,
-    override_bn: float | None = None,
+    override_b_p: float | None = None,
+    override_b_n: float | None = None,
     require_individual_optimize: bool = True,
     include_digitized_unordered: bool = False,
 ) -> None:
@@ -1055,8 +1055,8 @@ def run_multi_specimen_simulated_csvs(
         print(" ".join(msg_parts))
         return
 
-    if override_bp is not None or override_bn is not None:
-        print(f"  Overriding b_p={override_bp}, b_n={override_bn} (None = use CSV per row)")
+    if override_b_p is not None or override_b_n is not None:
+        print(f"  Overriding b_p={override_b_p}, b_n={override_b_n} (None = use CSV per row)")
     all_label = ", ".join([*specimens_path, *specimens_unordered])
     print(f"Writing simulated CSVs into {sim_dir} for specimens: {all_label}")
     for sid in specimens_path:
@@ -1071,8 +1071,8 @@ def run_multi_specimen_simulated_csvs(
             params_grouped.get_group(sid),
             catalog_by_name.loc[sid],
             sim_dir,
-            override_bp=override_bp,
-            override_bn=override_bn,
+            override_b_p=override_b_p,
+            override_b_n=override_b_n,
         )
 
     for name in specimens_unordered:
@@ -1104,8 +1104,8 @@ def run_multi_specimen_overlays(
     plots_dir: Path,
     params_path_label: str | Path = "parameters",
     specimen: str | None = None,
-    override_bp: float | None = None,
-    override_bn: float | None = None,
+    override_b_p: float | None = None,
+    override_b_n: float | None = None,
 ) -> None:
     """
     Load catalog, resolve specimens, and write overlays for each row in ``params_df``.
@@ -1160,8 +1160,8 @@ def run_multi_specimen_overlays(
     else:
         specimens = available
 
-    if override_bp is not None or override_bn is not None:
-        print(f"  Overriding b_p={override_bp}, b_n={override_bn} (None = use CSV per row)")
+    if override_b_p is not None or override_b_n is not None:
+        print(f"  Overriding b_p={override_b_p}, b_n={override_b_n} (None = use CSV per row)")
     print(f"Generating plots into {plots_dir} for specimens: {', '.join(specimens)}")
     for sid in specimens:
         if sid not in params_grouped.groups:
@@ -1176,8 +1176,8 @@ def run_multi_specimen_overlays(
             catalog_by_name.loc[sid],
             plots_dir,
             norm_xy_half=norm_xy_half,
-            override_bp=override_bp,
-            override_bn=override_bn,
+            override_b_p=override_b_p,
+            override_b_n=override_b_n,
         )
 
 
@@ -1205,14 +1205,14 @@ def main() -> None:
         help="Subfolder under results/plots/calibration/individual_optimize (default: overlays).",
     )
     parser.add_argument(
-        "--override-bp",
+        "--override-b-p",
         type=float,
         default=None,
         metavar="VAL",
         help="If set, use this b_p for every row instead of the CSV column.",
     )
     parser.add_argument(
-        "--override-bn",
+        "--override-b-n",
         type=float,
         default=None,
         metavar="VAL",
@@ -1224,15 +1224,15 @@ def main() -> None:
     plots_dir = PLOTS_BASE / args.output_dir
 
     params_df = pd.read_csv(params_path)
-    obp = float(args.override_bp) if args.override_bp is not None else None
-    obn = float(args.override_bn) if args.override_bn is not None else None
+    obp = float(args.override_b_p) if args.override_b_p is not None else None
+    obn = float(args.override_b_n) if args.override_b_n is not None else None
     run_multi_specimen_overlays(
         params_df,
         plots_dir=plots_dir,
         params_path_label=params_path,
         specimen=args.specimen,
-        override_bp=obp,
-        override_bn=obn,
+        override_b_p=obp,
+        override_b_n=obn,
     )
 
 
