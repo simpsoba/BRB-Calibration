@@ -11,7 +11,7 @@ uniaxialMaterial SteelMPF $mattag $fyp $fyn $E0 $bp $bn $R0 $cR1 $cR2 <$a1 $a2 $
 ## Install
 
 ```bash
-git clone https://github.com/gaaraujo/BRB-Calibration.git
+git clone https://github.com/simpsoba/BRB-Calibration.git
 cd BRB-Calibration
 pip install -r requirements.txt
 ```
