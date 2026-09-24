@@ -1243,11 +1243,11 @@ def get_sig0_overlay_segments_one_specimen(specimen_id: str) -> list[dict[str, o
     if row.empty:
         return None
     row = row.iloc[0]
-    L_T = float(row["L_T_in"])
-    L_y = float(row["L_y_in"])
-    A_sc = float(row["A_c_in2"])
-    A_t = float(row["A_t_in2"])
-    fy = float(row["f_yc_ksi"])
+    L_T = float(row["L_T"])
+    L_y = float(row["L_y"])
+    A_sc = float(row["A_sc"])
+    A_t = float(row["A_t"])
+    fy = float(row["fyp"])
     df = pd.read_csv(resampled_path)
     if "Force[kip]" not in df.columns or "Deformation[in]" not in df.columns:
         return None
@@ -1281,11 +1281,11 @@ def get_b_and_amplitude_lists_one_specimen(
     if row.empty:
         return ([], [], [], [])
     row = row.iloc[0]
-    L_T = float(row["L_T_in"])
-    L_y = float(row["L_y_in"])
-    A_sc = float(row["A_c_in2"])
-    A_t = float(row["A_t_in2"])
-    fy = float(row["f_yc_ksi"])
+    L_T = float(row["L_T"])
+    L_y = float(row["L_y"])
+    A_sc = float(row["A_sc"])
+    A_t = float(row["A_t"])
+    fy = float(row["fyp"])
     df = pd.read_csv(resampled_path)
     if "Force[kip]" not in df.columns or "Deformation[in]" not in df.columns:
         return ([], [], [], [])
@@ -1329,11 +1329,11 @@ def get_b_segment_scatter_metrics_one_specimen(specimen_id: str) -> dict[str, ob
     if row.empty:
         return None
     row = row.iloc[0]
-    L_T = float(row["L_T_in"])
-    L_y = float(row["L_y_in"])
-    A_sc = float(row["A_c_in2"])
-    A_t = float(row["A_t_in2"])
-    fy = float(row["f_yc_ksi"])
+    L_T = float(row["L_T"])
+    L_y = float(row["L_y"])
+    A_sc = float(row["A_sc"])
+    A_t = float(row["A_t"])
+    fy = float(row["fyp"])
     df = pd.read_csv(resampled_path)
     if "Force[kip]" not in df.columns or "Deformation[in]" not in df.columns:
         return None
@@ -1443,11 +1443,11 @@ def get_unordered_envelope_xmetrics_one_specimen(
     if row.empty:
         return None
     row = row.iloc[0]
-    L_T = float(row["L_T_in"])
-    L_y = float(row["L_y_in"])
-    A_sc = float(row["A_c_in2"])
-    A_t = float(row["A_t_in2"])
-    fy = float(row["f_yc_ksi"])
+    L_T = float(row["L_T"])
+    L_y = float(row["L_y"])
+    A_sc = float(row["A_sc"])
+    A_t = float(row["A_t"])
+    fy = float(row["fyp"])
     path = resolve_force_deformation_csv_for_max_strain(str(specimen_id), catalog, project_root=project_root)
     if path is None or not path.is_file():
         return None
@@ -1653,11 +1653,11 @@ def extract_bn_bp_unordered_row(sid: str, row: pd.Series) -> dict[str, float]:
     u, F = u[m], F[m]
     if len(u) == 0:
         raise ValueError(f"{sid}: no finite F-u points")
-    L_T = float(row["L_T_in"])
-    L_y = float(row["L_y_in"])
-    A_sc = float(row["A_c_in2"])
-    A_t = float(row["A_t_in2"])
-    fy = float(row["f_yc_ksi"])
+    L_T = float(row["L_T"])
+    L_y = float(row["L_y"])
+    A_sc = float(row["A_sc"])
+    A_t = float(row["A_t"])
+    fy = float(row["fyp"])
     Q = compute_Q(L_T, L_y, A_sc, A_t)
     E_hat = Q * E_ksi
     diag = compute_envelope_bn_unordered(
@@ -1756,11 +1756,11 @@ def main() -> None:
                 points, _ = find_cycle_points(df)
             else:
                 points, _ = loaded
-            L_T = float(row["L_T_in"])
-            L_y = float(row["L_y_in"])
-            A_sc = float(row["A_c_in2"])
-            A_t = float(row["A_t_in2"])
-            fy = float(row["f_yc_ksi"])
+            L_T = float(row["L_T"])
+            L_y = float(row["L_y"])
+            A_sc = float(row["A_sc"])
+            A_t = float(row["A_t"])
+            fy = float(row["fyp"])
             extra = extract_bn_bp_one_specimen(sid, df, points, L_T, L_y, A_sc, A_t, fy)
             out_row.update(extra)
             print(

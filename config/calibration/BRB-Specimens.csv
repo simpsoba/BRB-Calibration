@@ -1,4 +1,4 @@
-ID, Name   , f_yc_ksi, A_c_in2, A_t_in2, L_T_in, L_y_in, experimental_layout, path_ordered, skip_filter_resample, individual_optimize, generalized_weight
+ID, Name   , fyp, A_sc, A_t, L_T, L_y, experimental_layout, path_ordered, skip_filter_resample, individual_optimize, generalized_weight
 1, PC250  ,41.30,5.96,59.60,251.96,179.40, raw                , true        , false               , true               ,1
 2, PC350  ,41.30,8.34,83.40,252.02,183.30, raw                , true        , false               , true               ,1
 3, PC160  ,41.30,3.80,38.00,252.00,176.00, raw                , true        , false               , true               ,1
@@ -7,7 +7,7 @@ ID, Name   , f_yc_ksi, A_c_in2, A_t_in2, L_T_in, L_y_in, experimental_layout, pa
 6, PC750B ,37.90,17.87,178.70,251.96,179.40, raw                , true        , false               , true               ,1
 7, PC1200A,37.90,28.53,285.30,252.02,185.20, raw                , true        , false               , true               ,1
 8, PC1200B,37.90,28.62,286.20,251.96,181.30, raw                , true        , false               , true               ,1
-9, PC3SB  ,40.00,5.00,50.00,116.00,78.00, digitized          , true        , false               , true               ,1
+9, PC3SB  ,40.00,5.00,50.00,116.00,78.00, digitized          , true        , false               , true               ,0
 10, A5     ,44.08,5.66,56.60,215.55,148.70, digitized          , false       , true                , false              ,0
 11, B6     ,44.52,11.20,33.60,215.00,120.00, digitized          , false       , true                , false              ,0
 12, B7     ,44.52,11.20,33.60,215.00,120.00, digitized          , false       , true                , false              ,0

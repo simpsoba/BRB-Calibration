@@ -21,10 +21,14 @@ BRB-Specimens.csv: specimen metadata, **where input CSVs live**, and who is in w
   ``force_deformation.png`` in the same folder.
 
 **Catalog columns (see root README table)**
+  Geometry / yield use the same names as simulation CSVs: ``L_T``, ``L_y``, ``A_sc``, ``A_t``, ``fyp``.
+  ``read_catalog`` still accepts the older ``L_T_in`` / ``A_c_in2`` / ``f_yc_ksi`` headers and renames them.
   ``experimental_layout`` -- ``raw`` (lab specimen set) or ``digitized``.
   ``individual_optimize`` -- if true, the specimen may run ``optimize_brb_mse`` when resampled data exist.
-  ``generalized_weight`` -- non-negative; for **path-ordered** rows it sets contribution to the generalized
-    objective. **Unordered** digitized rows never enter that aggregate (effective weight 0 in ``specimen_weights.py``).
+  ``generalized_weight`` -- non-negative; for **path-ordered** rows it is the train weight in the
+    automated generalized fit (``run.sh`` / ``run.ps1``). **1** = train; **0** = validation only
+    (still scored/plotted, not in the joint objective). **Unordered** digitized rows never enter
+    that aggregate (effective weight 0 in ``specimen_weights.py``).
     Which generalized **configuration** (``set_id`` row in ``set_id_settings_generalized.csv``) applies is defined
     only in that CSV when running ``optimize_generalized_brb_mse`` (not in this catalog).
   ``path_ordered`` -- if true, ``force_deformation.csv`` is treated as a path series and the specimen
@@ -69,6 +73,17 @@ INDIVIDUAL_OPTIMIZE_COL = "individual_optimize"
 GENERALIZED_WEIGHT_COL = "generalized_weight"
 # Metrics column: which ``set_id`` row from ``set_id_settings_generalized.csv`` produced this eval row.
 GENERALIZED_CONFIG_SET_ID_COL = "generalized_config_set_id"
+
+# Geometry / yield: same names as simulation and parameter CSVs (units in the README).
+CATALOG_GEOMETRY_COLS = ("L_T", "L_y", "A_sc", "A_t", "fyp")
+# Older catalog headers accepted on load, then renamed to the canonical names above.
+_CATALOG_COLUMN_ALIASES = {
+    "L_T_in": "L_T",
+    "L_y_in": "L_y",
+    "A_c_in2": "A_sc",
+    "A_t_in2": "A_t",
+    "f_yc_ksi": "fyp",
+}
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent
@@ -193,7 +208,7 @@ def max_abs_strain_delta_over_Ly(
     if row.empty:
         return None
     if ly_in is None:
-        ly_in = float(row.iloc[0]["L_y_in"])
+        ly_in = float(catalog_geometry(row.iloc[0])["L_y"])
     if ly_in <= 0 or not np.isfinite(ly_in):
         return None
     try:
@@ -271,12 +286,63 @@ def _parse_bool_cell(x) -> bool:
     raise ValueError(f"Expected boolean string, got {x!r}")
 
 
+def _canonicalize_catalog_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Map legacy unit-suffixed headers onto ``L_T``, ``L_y``, ``A_sc``, ``A_t``, ``fyp``."""
+    rename: dict[str, str] = {}
+    for old, new in _CATALOG_COLUMN_ALIASES.items():
+        if old in df.columns and new not in df.columns:
+            rename[old] = new
+    if rename:
+        df = df.rename(columns=rename)
+    drop = [
+        c
+        for c, new in _CATALOG_COLUMN_ALIASES.items()
+        if c in df.columns and new in df.columns
+    ]
+    if drop:
+        df = df.drop(columns=drop)
+    return df
+
+
+def catalog_geometry(row: pd.Series) -> dict[str, float]:
+    """
+    Brace geometry + yield from one catalog row (canonical names, or legacy aliases).
+
+    Catalog ``fyp`` is used for both tension and compression unless ``fyn`` is present.
+    """
+    src = row.copy()
+    for old, new in _CATALOG_COLUMN_ALIASES.items():
+        if new not in src.index and old in src.index:
+            src[new] = src[old]
+    missing = [c for c in CATALOG_GEOMETRY_COLS if c not in src.index or pd.isna(src.get(c))]
+    if missing:
+        raise KeyError(f"catalog row missing {missing} for {src.get('Name')!r}")
+    fy = float(src["fyp"])
+    fyn = float(src["fyn"]) if "fyn" in src.index and pd.notna(src.get("fyn")) else fy
+    return {
+        "L_T": float(src["L_T"]),
+        "L_y": float(src["L_y"]),
+        "A_sc": float(src["A_sc"]),
+        "A_t": float(src["A_t"]),
+        "fyp": fy,
+        "fyn": fyn,
+    }
+
+
 def read_catalog(catalog_path: Path | None = None) -> pd.DataFrame:
     """Load ``BRB-Specimens.csv``, default columns, validate ``experimental_layout``."""
     path = catalog_path or CATALOG_PATH
     # skipinitialspace + stripped headers: spreadsheets often pad headers (e.g. ``Name   ``).
     df = pd.read_csv(path, skipinitialspace=True)
     df.columns = df.columns.astype(str).str.strip()
+    df = _canonicalize_catalog_columns(df)
+    missing_geom = [c for c in CATALOG_GEOMETRY_COLS if c not in df.columns]
+    if missing_geom:
+        raise ValueError(
+            f"BRB-Specimens.csv missing geometry columns {missing_geom}; "
+            f"expected {list(CATALOG_GEOMETRY_COLS)} "
+            f"(legacy aliases {list(_CATALOG_COLUMN_ALIASES)} are also accepted)."
+        )
     if "Name" not in df.columns:
         raise ValueError("BRB-Specimens.csv must have Name column")
     df = df.copy()

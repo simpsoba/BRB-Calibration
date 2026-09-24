@@ -23,6 +23,7 @@ NOTEBOOKS = [
     "01_single_specimen.ipynb",
     "02_individual.ipynb",
     "03_generalized.ipynb",
+    "04_generalized_l2_l1.ipynb",
 ]
 
 

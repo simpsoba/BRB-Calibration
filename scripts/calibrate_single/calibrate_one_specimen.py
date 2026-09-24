@@ -202,9 +202,9 @@ def _plot_cycle_debug(
     """Cycle-weight hysteresis map (path-ordered specimens only)."""
     cycles_dir = plots_base / "cycles"
     cycles_dir.mkdir(parents=True, exist_ok=True)
-    f_yc = float(cat_row["f_yc_ksi"])
-    A_c = float(cat_row["A_c_in2"])
-    L_y = float(cat_row["L_y_in"])
+    f_yc = float(cat_row["fyp"])
+    A_c = float(cat_row["A_sc"])
+    L_y = float(cat_row["L_y"])
 
     plot_cycle_weight_hysteresis(
         specimen,
@@ -229,16 +229,16 @@ def _parameter_row(
     b_p: float,
     b_n: float,
 ) -> pd.Series:
-    fy = float(cat_row["f_yc_ksi"])
+    fy = float(cat_row["fyp"])
     row = {
         "ID": int(cat_row["ID"]),
         "Name": specimen,
         "set_id": cfg.set_id,
         "steel_model": STEEL_MODEL,
-        "L_T": float(cat_row["L_T_in"]),
-        "L_y": float(cat_row["L_y_in"]),
-        "A_sc": float(cat_row["A_c_in2"]),
-        "A_t": float(cat_row["A_t_in2"]),
+        "L_T": float(cat_row["L_T"]),
+        "L_y": float(cat_row["L_y"]),
+        "A_sc": float(cat_row["A_sc"]),
+        "A_t": float(cat_row["A_t"]),
         "fyp": fy,
         "fyn": fy,
         "b_p": b_p,
@@ -427,11 +427,11 @@ def calibrate_and_plot(
         specimen,
         df,
         points,
-        float(cat_row["L_T_in"]),
-        float(cat_row["L_y_in"]),
-        float(cat_row["A_c_in2"]),
-        float(cat_row["A_t_in2"]),
-        float(cat_row["f_yc_ksi"]),
+        float(cat_row["L_T"]),
+        float(cat_row["L_y"]),
+        float(cat_row["A_sc"]),
+        float(cat_row["A_t"]),
+        float(cat_row["fyp"]),
     )
     b_p, b_n = _resolve_b_seeds(specimen, b_stats, cfg)
     print(

@@ -155,6 +155,7 @@ from postprocess.plot_dimensions import (  # noqa: E402
 from postprocess.plot_specimens import compute_raw_filtered_global_norm_limits  # noqa: E402
 from specimen_catalog import (  # noqa: E402
     GENERALIZED_CONFIG_SET_ID_COL,
+    catalog_geometry,
     list_names_digitized_unordered,
     path_ordered_resampled_force_csv_stems,
     read_catalog,
@@ -210,11 +211,12 @@ def _prow_from_catalog_and_generalized_settings(
         cat_row = cat_row.iloc[0]
     sm = normalize_steel_model(settings_row.get("steel_model"))
     steel = _full_numeric_seed(sm, settings_row)
-    fy = float(cat_row["f_yc_ksi"])
-    L_T = float(cat_row["L_T_in"])
-    L_y = float(cat_row["L_y_in"])
-    A_sc = float(cat_row["A_c_in2"])
-    A_t = float(cat_row["A_t_in2"])
+    geom = catalog_geometry(cat_row)
+    fy = geom["fyp"]
+    L_T = geom["L_T"]
+    L_y = geom["L_y"]
+    A_sc = geom["A_sc"]
+    A_t = geom["A_t"]
     out: dict[str, object] = {}
     if "ID" in cat_row.index and pd.notna(cat_row.get("ID")):
         out["ID"] = int(cat_row["ID"])

@@ -426,7 +426,7 @@ def _ly_from_params(prow: pd.Series, catalog_row: pd.Series) -> float:
     """Effective brace length L_y from params row or catalog."""
     if "L_y" in prow.index and pd.notna(prow.get("L_y")):
         return float(prow["L_y"])
-    return float(catalog_row["L_y_in"])
+    return float(catalog_row["L_y"])
 
 
 def _plot_one_subplot_norm(

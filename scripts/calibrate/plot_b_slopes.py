@@ -101,11 +101,11 @@ def plot_one_specimen(specimen_id: str, catalog_row: pd.Series, out_dir: Path) -
     else:
         points, _ = loaded
 
-    L_T = float(catalog_row["L_T_in"])
-    L_y = float(catalog_row["L_y_in"])
-    A_sc = float(catalog_row["A_c_in2"])
-    A_t = float(catalog_row["A_t_in2"])
-    fy = float(catalog_row["f_yc_ksi"])
+    L_T = float(catalog_row["L_T"])
+    L_y = float(catalog_row["L_y"])
+    A_sc = float(catalog_row["A_sc"])
+    A_t = float(catalog_row["A_t"])
+    fy = float(catalog_row["fyp"])
     fy_A = fy * A_sc
     Q = compute_Q(L_T, L_y, A_sc, A_t)
     E_hat = Q * E_ksi
@@ -368,11 +368,11 @@ def plot_one_digitized_unordered(specimen_id: str, catalog_row: pd.Series, out_d
     if len(u) == 0:
         return False
 
-    L_T = float(catalog_row["L_T_in"])
-    L_y = float(catalog_row["L_y_in"])
-    A_sc = float(catalog_row["A_c_in2"])
-    A_t = float(catalog_row["A_t_in2"])
-    fy = float(catalog_row["f_yc_ksi"])
+    L_T = float(catalog_row["L_T"])
+    L_y = float(catalog_row["L_y"])
+    A_sc = float(catalog_row["A_sc"])
+    A_t = float(catalog_row["A_t"])
+    fy = float(catalog_row["fyp"])
     fy_A = fy * A_sc
     if L_y <= 0 or fy_A <= 0:
         return False

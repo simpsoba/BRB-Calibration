@@ -1251,9 +1251,9 @@ def main() -> None:
                     mse_weights,
                     amp_meta,
                     CYCLE_WEIGHT_PLOTS_DIR,
-                    f_yc=float(cr["f_yc_ksi"]),
-                    A_c=float(cr["A_c_in2"]),
-                    L_y=float(cr["L_y_in"]),
+                    f_yc=float(cr["fyp"]),
+                    A_c=float(cr["A_sc"]),
+                    L_y=float(cr["L_y"]),
                 )
             except Exception as e:
                 print(f"  {sid} failed: {e}")

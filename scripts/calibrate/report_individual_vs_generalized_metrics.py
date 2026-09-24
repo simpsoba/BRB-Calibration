@@ -422,10 +422,10 @@ def _report_narrative_intro(specimens_path: Path, steel_seed_path: Path) -> list
             "individual_optimize",
             "averaged_weight",
             "generalized_weight",
-            "f_yc_ksi",
-            "A_c_in2",
-            "L_T_in",
-            "L_y_in",
+            "fyp",
+            "A_sc",
+            "L_T",
+            "L_y",
             "experimental_layout",
         ]
         use = [c for c in prefer if c in cat.columns]

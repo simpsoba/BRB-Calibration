@@ -4,7 +4,7 @@ from __future__ import annotations
 
 STEEL_MODEL_STEELMPF = "steelmpf"
 
-# Isotropic hardening parameters (stock OpenSeesPy SteelMPF through a4).
+# Isotropic hardening parameters (OpenSees SteelMPF through a4).
 STEELMPF_ISO_KEYS: tuple[str, ...] = ("a1", "a2", "a3", "a4")
 
 # Shared kinematic / modulus seeds in CSV.

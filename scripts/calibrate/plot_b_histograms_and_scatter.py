@@ -269,12 +269,12 @@ def plot_histograms_all(
 def _geometry_augment_for_scatter(df: pd.DataFrame) -> pd.DataFrame:
     """Add sqrt ratios and combined metrics for the shared b-vs-geometry panel layout."""
     df = df.copy()
-    if "L_T_in" in df.columns and "A_c_in2" in df.columns:
-        df["L_T_sqrt_A_sc"] = df["L_T_in"] / np.sqrt(df["A_c_in2"])
+    if "L_T" in df.columns and "A_sc" in df.columns:
+        df["L_T_sqrt_A_sc"] = df["L_T"] / np.sqrt(df["A_sc"])
     else:
         df["L_T_sqrt_A_sc"] = np.nan
-    if "L_y_in" in df.columns and "A_c_in2" in df.columns:
-        df["L_y_sqrt_A_sc"] = df["L_y_in"] / np.sqrt(df["A_c_in2"])
+    if "L_y" in df.columns and "A_sc" in df.columns:
+        df["L_y_sqrt_A_sc"] = df["L_y"] / np.sqrt(df["A_sc"])
     else:
         df["L_y_sqrt_A_sc"] = np.nan
     df["E_over_fy"] = np.where(df["fy_over_E"].notna() & (df["fy_over_E"] != 0), 1.0 / df["fy_over_E"], np.nan)
@@ -283,16 +283,16 @@ def _geometry_augment_for_scatter(df: pd.DataFrame) -> pd.DataFrame:
         1.0 / df["fy_over_E_hat"],
         np.nan,
     )
-    denom = df["f_yc_ksi"] * (df["L_T_in"] ** 2)
+    denom = df["fyp"] * (df["L_T"] ** 2)
     df["E_hat_A2_over_fy_LT"] = np.where(
         denom.notna() & (denom != 0),
-        df["E_hat"] * df["A_c_in2"] / denom,
+        df["E_hat"] * df["A_sc"] / denom,
         np.nan,
     )
-    denom_y = df["f_yc_ksi"] * (df.get("L_y_in", np.nan) ** 2)
+    denom_y = df["fyp"] * (df.get("L_y", np.nan) ** 2)
     df["E_A2_over_fy_Ly"] = np.where(
         denom_y.notna() & (denom_y != 0),
-        E_ksi * df["A_c_in2"] / denom_y,
+        E_ksi * df["A_sc"] / denom_y,
         np.nan,
     )
     return df
@@ -300,10 +300,10 @@ def _geometry_augment_for_scatter(df: pd.DataFrame) -> pd.DataFrame:
 
 # Panel layout shared by resampled (median/mean) and digitized (envelope) scatter figures.
 SCATTER_PANELS_ORDERED: list[tuple[str, str, tuple[float, float] | None]] = [
-    ("L_T_in", r"$L_T$ [in]", None),
-    ("L_y_in", r"$L_y$ [in]", None),
-    ("A_c_in2", r"$A_{sc}$ [in^2]", None),
-    ("f_yc_ksi", r"$f_y$ [ksi]", None),
+    ("L_T", r"$L_T$ [in]", None),
+    ("L_y", r"$L_y$ [in]", None),
+    ("A_sc", r"$A_{sc}$ [in^2]", None),
+    ("fyp", r"$f_y$ [ksi]", None),
     ("Q", r"$Q=\hat{E}/E$", None),
     ("L_T_sqrt_A_sc", r"$L_T / \sqrt{A_{sc}}$", (30.0, 180.0)),
     ("L_y_sqrt_A_sc", r"$L_y / \sqrt{A_{sc}}$", (0.0, 150.0)),
@@ -344,11 +344,11 @@ def build_digitized_envelope_bn_table(project_root: Path | None = None) -> pd.Da
         out_row = {k: v for k, v in row_cat.items()}
         if "Name" not in out_row:
             out_row["Name"] = sid
-        L_T = float(row_cat["L_T_in"])
-        L_y = float(row_cat["L_y_in"])
-        A_sc = float(row_cat["A_c_in2"])
-        A_t = float(row_cat["A_t_in2"])
-        fy = float(row_cat["f_yc_ksi"])
+        L_T = float(row_cat["L_T"])
+        L_y = float(row_cat["L_y"])
+        A_sc = float(row_cat["A_sc"])
+        A_t = float(row_cat["A_t"])
+        fy = float(row_cat["fyp"])
         Q = float(compute_Q(L_T, L_y, A_sc, A_t))
         E_hat = Q * E_ksi
         fy_over_E = fy / E_ksi if E_ksi != 0 else float("nan")
@@ -566,7 +566,7 @@ def plot_bn_bp_vs_abscissa(
         for sid in specimens_plot:
             if sid not in catalog_by_name.index:
                 continue
-            Ly = float(catalog_by_name.loc[sid]["L_y_in"])
+            Ly = float(catalog_by_name.loc[sid]["L_y"])
             if not np.isfinite(Ly) or Ly <= 0:
                 continue
             col = color_by_name.get(sid, (0.5, 0.5, 0.5, 1.0))
@@ -830,7 +830,7 @@ def plot_norm_stress_origin_elastic_vs_abscissa(
         for sid in specimens_plot:
             if sid not in catalog_by_name.index:
                 continue
-            Ly = float(catalog_by_name.loc[sid]["L_y_in"])
+            Ly = float(catalog_by_name.loc[sid]["L_y"])
             if not np.isfinite(Ly) or Ly <= 0:
                 continue
             col = color_by_name.get(sid, (0.5, 0.5, 0.5, 1.0))
@@ -1022,7 +1022,7 @@ def plot_sigma0_norm_vs_abscissa(
         for sid in specimens_plot:
             if sid not in catalog_by_name.index:
                 continue
-            Ly = float(catalog_by_name.loc[sid]["L_y_in"])
+            Ly = float(catalog_by_name.loc[sid]["L_y"])
             if not np.isfinite(Ly) or Ly <= 0:
                 continue
             col = color_by_name.get(sid, (0.5, 0.5, 0.5, 1.0))

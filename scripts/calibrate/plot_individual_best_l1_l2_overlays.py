@@ -318,7 +318,7 @@ def _params_row_for(params_df: pd.DataFrame, name: str, set_id: int) -> pd.Serie
 def _ly_from_params_or_catalog(prow: pd.Series, catalog_row: pd.Series) -> float:
     if "L_y" in prow.index and pd.notna(prow.get("L_y")):
         return float(prow["L_y"])
-    return float(catalog_row["L_y_in"])
+    return float(catalog_row["L_y"])
 
 
 def _read_simulated_csv(sim_dir: Path, name: str, set_id: int) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:

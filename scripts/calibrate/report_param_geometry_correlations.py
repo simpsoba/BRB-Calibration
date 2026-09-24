@@ -23,6 +23,8 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 _SCRIPTS = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_SCRIPTS))
 
+from postprocess.specimen_catalog import read_catalog  # noqa: E402
+
 
 
 def _repo_root() -> Path:
@@ -109,20 +111,20 @@ def _pick_optimal_rows(
 def _resolve_Q(catalog_row: pd.Series) -> float:
     from model.brace_geometry import compute_Q
 
-    L_T = float(catalog_row["L_T_in"])
-    L_y = float(catalog_row["L_y_in"])
-    A_sc = float(catalog_row["A_c_in2"])
-    A_t = float(catalog_row["A_t_in2"])
+    L_T = float(catalog_row["L_T"])
+    L_y = float(catalog_row["L_y"])
+    A_sc = float(catalog_row["A_sc"])
+    A_t = float(catalog_row["A_t"])
     return compute_Q(L_T, L_y, A_sc, A_t)
 
 
 def _geometry_features(catalog_row: pd.Series, E_kpsi: float, Q: float) -> dict[str, float]:
-    L_y = float(catalog_row["L_y_in"])
-    L_T = float(catalog_row["L_T_in"])
-    A_sc = float(catalog_row["A_c_in2"])
-    fy = float(catalog_row["f_yc_ksi"])
+    L_y = float(catalog_row["L_y"])
+    L_T = float(catalog_row["L_T"])
+    A_sc = float(catalog_row["A_sc"])
+    fy = float(catalog_row["fyp"])
     if A_sc <= 0:
-        raise ValueError(f"Non-positive A_c_in2 for {catalog_row.get('Name')!r}")
+        raise ValueError(f"Non-positive A_sc for {catalog_row.get('Name')!r}")
     Ly2_A = L_y**2 / A_sc
     LT2_A = L_T**2 / A_sc
     E_over_fy = E_kpsi / fy
@@ -506,7 +508,7 @@ def main() -> None:
     )
     args = p.parse_args()
 
-    catalog = _read_csv_skip_hash(Path(args.catalog))
+    catalog = read_catalog(Path(args.catalog))
     metrics = pd.read_csv(Path(args.metrics))
     optimized = pd.read_csv(Path(args.optimized_params))
     apparent = pd.read_csv(Path(args.apparent_bn_bp))

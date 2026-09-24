@@ -1047,16 +1047,26 @@ def feature_mae_cycles(
 
 
 def load_p_y_kip_catalog(project_root: Path, name: str, fallback_fyp_ksi: float, a_sc: float) -> float:
-    """Nominal yield force P_y [kip] = f_yc_ksi * A_c_in2 from BRB-Specimens.csv if possible, else fyp * A_sc."""
+    """Nominal yield force P_y [kip] = fyp * A_sc from BRB-Specimens.csv if possible, else fyp * A_sc."""
     cat = Path(project_root) / "config" / "calibration" / "BRB-Specimens.csv"
     if cat.is_file():
         try:
             df = pd.read_csv(cat, skipinitialspace=True)
             df.columns = df.columns.astype(str).str.strip()
-            row = df[df["Name"].astype(str) == str(name)]
+            aliases = {
+                "L_T_in": "L_T",
+                "L_y_in": "L_y",
+                "A_c_in2": "A_sc",
+                "A_t_in2": "A_t",
+                "f_yc_ksi": "fyp",
+            }
+            df = df.rename(
+                columns={old: new for old, new in aliases.items() if old in df.columns and new not in df.columns}
+            )
+            row = df[df["Name"].astype(str).str.strip() == str(name).strip()]
             if not row.empty:
-                fyc = float(row.iloc[0]["f_yc_ksi"])
-                ac = float(row.iloc[0]["A_c_in2"])
+                fyc = float(row.iloc[0]["fyp"])
+                ac = float(row.iloc[0]["A_sc"])
                 fy = fyc * ac
                 if np.isfinite(fy) and fy > 0.0:
                     return fy

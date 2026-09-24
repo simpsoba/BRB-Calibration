@@ -357,7 +357,7 @@ def run_individual_specimens(
 def run_generalized_demo(
     train_specimens: Sequence[str] | Mapping[str, float],
     *,
-    set_id_row: Mapping[str, object],
+    set_id_row: Mapping[str, object] | Sequence[Mapping[str, object]],
     train_weights: Mapping[str, float] | None = None,
     eval_specimens: Sequence[str] | None = None,
     prepare_data: bool = True,
@@ -374,10 +374,20 @@ def run_generalized_demo(
 
     ``eval_specimens`` are validation Names (path-ordered and/or digitized unordered):
     metrics and overlays after the fit, weight 0 so they do not enter the joint objective.
+
+    ``set_id_row`` is one recipe, or a list of recipes (e.g. L2 then L1). Each becomes
+    one ``set_id`` row in the settings CSV; the optimizer runs them in one call.
     """
     ensure_sys_path()
     work = Path(work_dir or (NOTEBOOK_RESULTS / "generalized"))
     work.mkdir(parents=True, exist_ok=True)
+
+    if isinstance(set_id_row, Mapping):
+        settings_rows: list[Mapping[str, object]] = [set_id_row]
+    else:
+        settings_rows = [dict(r) for r in set_id_row]
+    if not settings_rows:
+        raise ValueError("set_id_row is empty")
 
     if isinstance(train_specimens, Mapping):
         weight_by_name = {str(k): float(v) for k, v in train_specimens.items()}
@@ -409,10 +419,12 @@ def run_generalized_demo(
             if not uses_unordered_inputs(get_specimen_record(n, cat))
         ]
         if path_ordered_prep:
-            prepare_specimens(path_ordered_prep, e_ksi=float(set_id_row.get("E", 29000)))
+            prepare_specimens(
+                path_ordered_prep, e_ksi=float(settings_rows[0].get("E", 29000))
+            )
 
     settings_path = write_set_id_settings_csv(
-        work / "set_id_settings_generalized.csv", [set_id_row]
+        work / "set_id_settings_generalized.csv", settings_rows
     )
     params_out = work / "generalized_brb_parameters.csv"
     metrics_out = work / "generalized_params_eval_metrics.csv"
@@ -445,6 +457,7 @@ def run_generalized_demo(
         "train_weights": weight_by_name,
         "eval_specimens": validation,
         "validation_specimens": validation,
+        "set_ids": [int(r["set_id"]) for r in settings_rows],
     }
 
 
@@ -501,14 +514,15 @@ def params_dict_from_row(row: pd.Series | Mapping[str, object]) -> dict[str, flo
     |-----|---------|------|
     | `L_T`, `L_y` | total / yielding length | in |
     | `A_sc`, `A_t` | core / transition area | in² |
-    | `fyp`, `fyn` | yield stress (+/−) | ksi |
-    | `E` | elastic modulus (before brace `Q`) | ksi |
-    | `b_p`, `b_n` | kinematic hardening ratio | — |
-    | `R0`, `cR1`, `cR2` | MP transition curvature | — |
+    | `fyp`, `fyn` | yield strength in tension (+) / compression (−) | ksi |
+    | `E` | initial modulus (brace model uses `E_hat = Q·E`) | ksi |
+    | `b_p`, `b_n` | strain-hardening ratio in tension / compression | — |
+    | `R0` | initial curvature of the elastic ↔ post-yield transition (Bauschinger rounding) | — |
+    | `cR1`, `cR2` | how transition curvature `R` degrades with plastic excursion | — |
     | `a1`, `a2` | compression isotropic scale / threshold | — |
     | `a3`, `a4` | tension isotropic scale / threshold | — |
 
-    Displacement drive and simulated force are inches and kips.
+    Displacement histories and simulated force are inches and kips.
     """
     if isinstance(row, pd.Series):
         get = row.__getitem__
@@ -586,19 +600,12 @@ def simulate_force_disp(
 def geometry_from_catalog(specimen: str, *, E: float = 29000.0) -> dict[str, float]:
     """Catalog geometry + fy for ``simulate_force_disp`` (SteelMPF keys filled by caller)."""
     ensure_sys_path()
-    from specimen_catalog import read_catalog  # noqa: WPS433
+    from specimen_catalog import catalog_geometry, read_catalog  # noqa: WPS433
 
     row = read_catalog().loc[lambda df: df["Name"].astype(str) == str(specimen)].iloc[0]
-    fy = float(row["f_yc_ksi"])
-    return {
-        "L_T": float(row["L_T_in"]),
-        "L_y": float(row["L_y_in"]),
-        "A_sc": float(row["A_c_in2"]),
-        "A_t": float(row["A_t_in2"]),
-        "fyp": fy,
-        "fyn": fy,
-        "E": float(E),
-    }
+    out = catalog_geometry(row)
+    out["E"] = float(E)
+    return out
 
 
 def make_cyclic_drive(
@@ -607,7 +614,7 @@ def make_cyclic_drive(
     n_quarter: int = 40,
 ) -> np.ndarray:
     """
-    Synthetic BRB-like drive: for each amplitude A, path 0→+A→0→−A→0.
+    Synthetic BRB-like displacement history: for each amplitude A, path 0→+A→0→−A→0.
 
     ``n_quarter`` samples per quarter-cycle leg (excluding the shared endpoint).
     """
@@ -1052,7 +1059,7 @@ def plot_prep_stages(specimen: str, *, max_points: int = 8000) -> None:
 
 
 def _cum_abs_deformation(disp: np.ndarray) -> np.ndarray:
-    """Cumulative path length along the deformation drive: Σ|Δδ| (inches)."""
+    """Cumulative path length along the deformation history: Σ|Δδ| (inches)."""
     d = np.asarray(disp, dtype=float)
     if d.size == 0:
         return d
@@ -1153,9 +1160,9 @@ def digitized_unordered_sim_arrays(
     p: Mapping[str, float],
 ) -> dict[str, object]:
     """
-    Drive + cloud for a digitized unordered specimen with shared SteelMPF ``p``.
+    Displacement history + cloud for a digitized unordered specimen with shared SteelMPF ``p``.
 
-    Returns dict with ``u_cloud``, ``F_cloud``, ``D_drive``, ``F_sim``, and
+    Returns dict with ``u_cloud``, ``F_cloud``, ``D_drive`` (commanded history), ``F_sim``, and
     ``J_binenv`` / ``J_binenv_l1`` from ``compute_unordered_cloud_metrics``.
     Envelope ``b_p``/``b_n`` from the cloud replace those in ``p`` for the sim
     (same rule as generalized eval).
@@ -1258,11 +1265,10 @@ def summarize_generalized_train_validation_metrics(
             "specimen_weight": df["specimen_weight"] if "specimen_weight" in df.columns else np.nan,
         }
     )
+    if "set_id" in df.columns:
+        out.insert(1, "set_id", df["set_id"].to_numpy())
+        return out.sort_values(["set_id", "role", "Name"]).reset_index(drop=True)
     return out.sort_values(["role", "Name"]).reset_index(drop=True)
-
-
-# Backward-compatible alias
-summarize_generalized_train_holdout_metrics = summarize_generalized_train_validation_metrics
 
 
 def show_specimen_catalog(
@@ -1302,11 +1308,11 @@ def show_specimen_catalog(
             "Name",
             "experimental_layout",
             "path_ordered",
-            "f_yc_ksi",
-            "A_c_in2",
-            "A_t_in2",
-            "L_T_in",
-            "L_y_in",
+            "fyp",
+            "A_sc",
+            "A_t",
+            "L_T",
+            "L_y",
             "individual_optimize",
             "generalized_weight",
         )
@@ -1383,8 +1389,8 @@ It does that by minimizing a **weighted sum** of a few error terms:
 
 | Weight | Plain-language meaning |
 |--------|------------------------|
-| `w_feat_l2` / `w_feat_l1` | How well we hit the **important points** on each cycle (peaks, unload, re-yield). Demos usually turn **exactly one** of these on (set to 1). |
-| `w_energy_l2` / `w_energy_l1` | How well per-cycle **energy** (`|∫ F du|`) matches. Usually left at 0. |
+| `w_feat_l2` / `w_feat_l1` | How much the fit weights L2 vs L1 error on the **important points** of each cycle (peaks, unload, re-yield). Demos usually put all the weight on one (set it to 1, the other to 0). |
+| `w_energy_l2` / `w_energy_l1` | How well per-cycle **energy** (abs of `∫ F du`) matches. Usually left at 0. |
 | `w_unordered_binenv_l2` / `w_unordered_binenv_l1` | How well the **outer force envelope** matches when you only have a cloud of `(D, F)` points (digitized tests). Usually weight 0 in the fit; still reported as a diagnostic. |
 
 Even when a weight is 0, the metrics tables still **print** that column so you can look at it.
@@ -1402,5 +1408,46 @@ These settings do **not** add a new term. They only change how cycles are mixed
 | `use_amplitude_weights=True` | Larger cycles count more: `w_c = (A_c / A_max)^p + ε`. |
 | `amplitude_weight_power` (`p`) | How strongly amplitude boosts the weight. |
 | `amplitude_weight_eps` (`ε`) | Small floor so tiny cycles are not ignored completely. |
+""".strip()
+
+
+NOTEBOOK_SETTINGS_HELP = """
+## What the calibration settings mean
+
+These notebooks run **one configuration at a time** (one specimen list + one
+SteelMPF / loss recipe). The automated pipeline does the same idea over the full
+catalog, often with two recipes (e.g. `set_id=1` for L2, `set_id=3` for L1).
+
+| Setting | Meaning |
+|---------|---------|
+| **`set_id`** | Integer tag for this run so results do not overwrite each other. Example: an L2-based optimization as `set_id=1`, another (L1) as `set_id=3`. |
+| **`inherit_from_set`** | `-999` (or blank) = start from the **seeds** below. Otherwise reuse the **optimized parameters** from that other `set_id` as this run’s starting point, then change whatever you want here (loss weights, which params are free, seeds for params that stay fixed, …). |
+| **Seeds** (`E`, `b_p`, `b_n`, `R0`, …) | Starting SteelMPF values when you are not inheriting. Parameters **not** listed in `optimize_params` stay fixed at these seeds. Free parameters **start** here (or from the inherited set) and move during L-BFGS-B. |
+| **`optimize_params`** | Which SteelMPF names the optimizer may change. Everything else stays at its seed (or inherited value). |
+| **`w_feat_l2` / `w_feat_l1`** | How much the objective weights L2 vs L1 error on characteristic points. `1` and `0` means “all L2”; swap them for all L1; both nonzero mixes the two. |
+| **`b_p` / `b_n` seeds** | A numeric guess, or a keyword that **extracts** the value from the experimental hysteresis cycles: `median` (across cycles), `mean`, `weighted_mean`, plus `q1`, `q3`, `min`, `max`, … |
+
+### Common edits (copy into the Parameters cell)
+
+**Free a different parameter set**
+
+```python
+# Fewer free params (pipeline individual default style):
+OPTIMIZE_PARAMS = ["cR1", "cR2", "a1", "a3"]
+# More free params (single-specimen / generalized demo style):
+# OPTIMIZE_PARAMS = ["b_p", "b_n", "R0", "cR1", "cR2", "a1", "a3"]
+```
+
+**Run L2, then L1** (like pipeline `set_id=1` then `set_id=3`)
+
+```python
+# set_id = 3          # optional label for outputs
+# w_feat_l2 = 0
+# w_feat_l1 = 1
+```
+
+Run once with L2 / `set_id=1` (the defaults). To add an L1 pass, change the loss
+weights and `set_id` to 3 and run again. Optionally set `inherit_from_set=1` on
+the second pass so L1 starts from the L2 result.
 """.strip()
 

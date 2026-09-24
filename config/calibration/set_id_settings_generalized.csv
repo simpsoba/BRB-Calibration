@@ -1,5 +1,7 @@
 # Per-set_id seeds and loss for generalized (group) calibration. Edit this file — not the optimizer.
 # Specimens with generalized_weight > 0 in BRB-Specimens.csv enter the shared fit.
+# Weight 0 = validation only (scored after the fit). Train cohort: the eight PC lab BRBs
+# (PC160, PC250, PC350, PC500, PC750A/B, PC1200A/B). PC3SB and STF01 are validation.
 set_id, inherit_from_set, E    , b_p  , b_n  , R0  , cR1   , cR2 , a1  , a2  , a3  , a4  , optimize_params          , w_feat_l2, w_feat_l1, w_energy_l2, w_energy_l1, w_unordered_binenv_l2, w_unordered_binenv_l1, use_amplitude_weights, amplitude_weight_power, amplitude_weight_eps
      1, -999            , 29000, 0.005, 0.025, 20  , 0.8875, 0.15, 0.04, 1   , 0.04, 1   , "b_p,b_n,cR1,cR2,a1,a3"  ,         1,         0,           0,           0,                     0,                     0, TRUE                 ,                      2,                 0.05
      3, -999            , 29000, 0.005, 0.025, 20  , 0.8875, 0.15, 0.04, 1   , 0.04, 1   , "b_p,b_n,cR1,cR2,a1,a3"  ,         0,         1,           0,           0,                     0,                     0, TRUE                 ,                      2,                 0.05

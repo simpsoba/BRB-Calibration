@@ -190,9 +190,9 @@ def compute_raw_filtered_global_norm_limits(
         raw_df, filtered_df, _resampled_df = load_specimen_data(specimen_id, catalog)
         if raw_df is None:
             continue
-        f_yc = float(catalog_row["f_yc_ksi"])
-        A_c = float(catalog_row["A_c_in2"])
-        L_y = float(catalog_row["L_y_in"])
+        f_yc = float(catalog_row["fyp"])
+        A_c = float(catalog_row["A_sc"])
+        L_y = float(catalog_row["L_y"])
         raw_n = normalize(raw_df, f_yc, A_c, L_y)
         x_vals = raw_n["Deformation_norm"].values
         y_vals = raw_n["Force_norm"].values
@@ -298,9 +298,9 @@ def plot_one_specimen(
     unordered_digitized: bool = False,
 ) -> None:
     """One figure per specimen: trimmed raw + filtered (normalized); markers in filtered index space."""
-    f_yc = float(catalog_row["f_yc_ksi"])
-    A_c = float(catalog_row["A_c_in2"])
-    L_y = float(catalog_row["L_y_in"])
+    f_yc = float(catalog_row["fyp"])
+    A_c = float(catalog_row["A_sc"])
+    L_y = float(catalog_row["L_y"])
     raw_n = normalize(raw_df, f_yc, A_c, L_y)
     filtered_n = normalize(filtered_df, f_yc, A_c, L_y) if filtered_df is not None else None
 
@@ -388,7 +388,7 @@ def plot_time_histories_scatter_one(
     Plotting raw index 0..n-1 and filtered ``Step`` 0..m-1 on one axis hides the shorter series when
     ``n != m`` (e.g. stale filtered file still on disk after the raw drive was replaced).
     """
-    L_y = float(catalog_row["L_y_in"])
+    L_y = float(catalog_row["L_y"])
     if L_y <= 0 or not np.isfinite(L_y):
         L_y = 1.0
 
@@ -507,9 +507,9 @@ def plot_all_specimens(
             if raw_df is None:
                 continue
             unordered_digitized = uses_unordered_inputs(get_specimen_record(specimen_id, catalog))
-            f_yc = float(catalog_row["f_yc_ksi"])
-            A_c = float(catalog_row["A_c_in2"])
-            L_y = float(catalog_row["L_y_in"])
+            f_yc = float(catalog_row["fyp"])
+            A_c = float(catalog_row["A_sc"])
+            L_y = float(catalog_row["L_y"])
             raw_n = normalize(raw_df, f_yc, A_c, L_y)
             use_label = idx == 0
             filtered_n = None
@@ -582,9 +582,9 @@ def plot_raw_before_after_trim_one(
     out_dir: Path,
 ) -> None:
     """One figure per specimen: raw before trim vs raw after trim (normalized)."""
-    f_yc = float(catalog_row["f_yc_ksi"])
-    A_c = float(catalog_row["A_c_in2"])
-    L_y = float(catalog_row["L_y_in"])
+    f_yc = float(catalog_row["fyp"])
+    A_c = float(catalog_row["A_sc"])
+    L_y = float(catalog_row["L_y"])
     before_n = normalize(raw_before, f_yc, A_c, L_y)
     after_n = normalize(raw_after, f_yc, A_c, L_y)
     with single_axis_style_context():
@@ -637,9 +637,9 @@ def plot_time_histories_one(
     out_dir: Path,
 ) -> None:
     """One figure per specimen: normalized axial force and strain vs index; raw, trimmed, filtered; cycle points."""
-    f_yc = float(catalog_row["f_yc_ksi"])
-    A_c = float(catalog_row["A_c_in2"])
-    L_y = float(catalog_row["L_y_in"])
+    f_yc = float(catalog_row["fyp"])
+    A_c = float(catalog_row["A_sc"])
+    L_y = float(catalog_row["L_y"])
     fyA = f_yc * A_c
     if fyA <= 0 or not np.isfinite(fyA):
         fyA = 1.0
@@ -774,9 +774,9 @@ def plot_raw_before_after_trim_all(
         if raw_df is None:
             continue
         catalog_row = catalog_by_name.loc[specimen_id]
-        f_yc = float(catalog_row["f_yc_ksi"])
-        A_c = float(catalog_row["A_c_in2"])
-        L_y = float(catalog_row["L_y_in"])
+        f_yc = float(catalog_row["fyp"])
+        A_c = float(catalog_row["A_sc"])
+        L_y = float(catalog_row["L_y"])
         raw_n = normalize(raw_df, f_yc, A_c, L_y)
         x_vals = raw_n["Deformation_norm"].values
         y_vals = raw_n["Force_norm"].values
@@ -823,9 +823,9 @@ def plot_raw_before_after_trim_all(
                 _set_axes_frame(ax)
                 continue
             catalog_row = catalog_by_name.loc[specimen_id]
-            f_yc = float(catalog_row["f_yc_ksi"])
-            A_c = float(catalog_row["A_c_in2"])
-            L_y = float(catalog_row["L_y_in"])
+            f_yc = float(catalog_row["fyp"])
+            A_c = float(catalog_row["A_sc"])
+            L_y = float(catalog_row["L_y"])
             before_n = normalize(raw_before, f_yc, A_c, L_y)
             after_n = normalize(raw_after, f_yc, A_c, L_y)
             use_label = not trim_legend_done

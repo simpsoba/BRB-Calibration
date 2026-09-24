@@ -248,11 +248,11 @@ def process_specimen(
         boundary_indices = sorted({int(p["idx"]) for p in points} | {0, n})
 
     row = catalog_by_name.loc[name]
-    L_T = float(row["L_T_in"])
-    L_y = float(row["L_y_in"])
-    A_sc = float(row["A_c_in2"])
-    A_t = float(row["A_t_in2"])
-    fyp = float(row["f_yc_ksi"])
+    L_T = float(row["L_T"])
+    L_y = float(row["L_y"])
+    A_sc = float(row["A_sc"])
+    A_t = float(row["A_t"])
+    fyp = float(row["fyp"])
     E_ksi = float(e_by_name.get(name, DEFAULT_E_KSI))
 
     u_col = df[DEF_COL].to_numpy(dtype=float)
@@ -352,11 +352,11 @@ def process_specimen_digitized_unordered(
         boundary_indices = sorted({int(p["idx"]) for p in points} | {0, n})
 
     row = catalog_by_name.loc[name]
-    L_T = float(row["L_T_in"])
-    L_y = float(row["L_y_in"])
-    A_sc = float(row["A_c_in2"])
-    A_t = float(row["A_t_in2"])
-    fyp = float(row["f_yc_ksi"])
+    L_T = float(row["L_T"])
+    L_y = float(row["L_y"])
+    A_sc = float(row["A_sc"])
+    A_t = float(row["A_t"])
+    fyp = float(row["fyp"])
     E_ksi = float(e_by_name.get(name, DEFAULT_E_KSI))
     u_col = df[DEF_COL].to_numpy(dtype=float)
     d_samp = d_sampling_from_brace_params(

@@ -25,7 +25,7 @@ from calibrate.steel_model import STEEL_MODEL_STEELMPF  # noqa: E402
 
 STEEL_MODEL = STEEL_MODEL_STEELMPF
 
-# SteelMPF numeric seed columns in input.csv (stock model through a4; no ultimate-strength tail).
+# SteelMPF numeric seed columns in input.csv (model through a4; no ultimate-strength tail).
 STEELMPF_NUMERIC_SEED_KEYS = (
     "E",
     "R0",

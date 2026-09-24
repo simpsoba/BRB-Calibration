@@ -746,11 +746,11 @@ def build_initial_rows(
     for _, r in merged.iterrows():
         name = str(r["Name"])
         cid = int(r["ID"])
-        L_T = float(r["L_T_in"])
-        L_y = float(r["L_y_in"])
-        A_sc = float(r["A_c_in2"])
-        A_t = float(r["A_t_in2"])
-        fy = float(r["f_yc_ksi"])
+        L_T = float(r["L_T"])
+        L_y = float(r["L_y"])
+        A_sc = float(r["A_sc"])
+        A_t = float(r["A_t"])
+        fy = float(r["fyp"])
 
         for seed in seeds:
             inherited: dict[str, float] | None = None

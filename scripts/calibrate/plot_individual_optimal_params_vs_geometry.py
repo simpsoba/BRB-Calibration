@@ -40,6 +40,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+from postprocess.specimen_catalog import read_catalog  # noqa: E402
 from postprocess.specimen_colors import specimen_color_by_name_map  # noqa: E402
 
 METRIC_PARAM_CHECK = [
@@ -239,10 +240,10 @@ def _resolve_Q(catalog_row: pd.Series, apparent_row: pd.Series | None) -> float:
             return float(q)
     from model.brace_geometry import compute_Q
 
-    L_T = float(catalog_row["L_T_in"])
-    L_y = float(catalog_row["L_y_in"])
-    A_sc = float(catalog_row["A_c_in2"])
-    A_t = float(catalog_row["A_t_in2"])
+    L_T = float(catalog_row["L_T"])
+    L_y = float(catalog_row["L_y"])
+    A_sc = float(catalog_row["A_sc"])
+    A_t = float(catalog_row["A_t"])
     return compute_Q(L_T, L_y, A_sc, A_t)
 
 
@@ -253,7 +254,7 @@ def _resolve_E_kpsi(
 ) -> float:
     if E_from_opt is not None and np.isfinite(E_from_opt):
         return float(E_from_opt)
-    fy = float(catalog_row["f_yc_ksi"])
+    fy = float(catalog_row["fyp"])
     if apparent_row is not None:
         fe = apparent_row.get("fy_over_E")
         if fe is not None and pd.notna(fe) and float(fe) > 0:
@@ -266,12 +267,12 @@ def _geometry_features(
     E_kpsi: float,
     Q: float,
 ) -> dict[str, float]:
-    L_y = float(catalog_row["L_y_in"])
-    L_T = float(catalog_row["L_T_in"])
-    A_sc = float(catalog_row["A_c_in2"])
-    fy = float(catalog_row["f_yc_ksi"])
+    L_y = float(catalog_row["L_y"])
+    L_T = float(catalog_row["L_T"])
+    A_sc = float(catalog_row["A_sc"])
+    fy = float(catalog_row["fyp"])
     if A_sc <= 0:
-        raise ValueError(f"Non-positive A_c_in2 for {catalog_row.get('Name')!r}")
+        raise ValueError(f"Non-positive A_sc for {catalog_row.get('Name')!r}")
     Ly2_A = L_y**2 / A_sc
     LT2_A = L_T**2 / A_sc
     E_over_fy = E_kpsi / fy
@@ -709,10 +710,7 @@ def main() -> None:
 
     _apply_font_scale()
 
-    catalog = _read_csv_skip_hash(args.catalog)
-    # BRB-Specimens.csv often pads names in the spreadsheet; metrics/optimized use stripped keys.
-    if "Name" in catalog.columns:
-        catalog["Name"] = catalog["Name"].astype(str).str.strip()
+    catalog = read_catalog(args.catalog)
     metrics = pd.read_csv(args.metrics)
     optimized = pd.read_csv(args.optimized_params)
     apparent = pd.read_csv(args.apparent_bn_bp)

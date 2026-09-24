@@ -406,10 +406,10 @@ def load_digitized_unordered_series(
     if steel_row is not None and catalog_row is not None:
         brace = {
             "fyp_ksi": float(steel_row["fyp"]),
-            "L_T_in": float(catalog_row["L_T_in"]),
-            "L_y_in": float(catalog_row["L_y_in"]),
-            "A_sc_in2": float(catalog_row["A_c_in2"]),
-            "A_t_in2": float(catalog_row["A_t_in2"]),
+            "L_T_in": float(catalog_row["L_T"]),
+            "L_y_in": float(catalog_row["L_y"]),
+            "A_sc_in2": float(catalog_row["A_sc"]),
+            "A_t_in2": float(catalog_row["A_t"]),
             "E_ksi": float(steel_row["E"]),
         }
 
@@ -431,7 +431,7 @@ def load_digitized_unordered_series(
                 fyp_ksi=float(brace["fyp_ksi"]),
                 L_T_in=float(brace["L_T_in"]),
                 L_y_in=float(brace["L_y_in"]),
-                A_sc_in2=float(brace["A_c_in2"]),
+                A_sc_in2=float(brace["A_sc_in2"]),
                 A_t_in2=float(brace["A_t_in2"]),
                 E_ksi=float(brace["E_ksi"]),
                 u_fallback=D_raw,
@@ -452,11 +452,11 @@ def eval_row_with_envelope_bn_from_unordered(
 ) -> pd.Series:
     """Copy of ``eval_row`` with ``b_p`` / ``b_n`` replaced by envelope estimates from unordered F–u."""
     out = eval_row.copy()
-    L_T = float(catalog_row["L_T_in"])
-    L_y = float(catalog_row["L_y_in"])
-    A_sc = float(catalog_row["A_c_in2"])
-    A_t = float(catalog_row["A_t_in2"])
-    f_yc = float(catalog_row["f_yc_ksi"])
+    L_T = float(catalog_row["L_T"])
+    L_y = float(catalog_row["L_y"])
+    A_sc = float(catalog_row["A_sc"])
+    A_t = float(catalog_row["A_t"])
+    f_yc = float(catalog_row["fyp"])
     E_ksi = float(eval_row["E"])
     diag = compute_envelope_bn_unordered(
         u_unordered,

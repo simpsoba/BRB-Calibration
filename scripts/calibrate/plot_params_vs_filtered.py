@@ -126,7 +126,7 @@ def _path_ordered_sim_kwargs(
         )
         return None
     if "L_y" not in prow.index or pd.isna(prow.get("L_y")):
-        sim_kw["L_y"] = float(catalog_row["L_y_in"])
+        sim_kw["L_y"] = float(catalog_row["L_y"])
     if override_b_p is not None:
         sim_kw["b_p"] = float(override_b_p)
     if override_b_n is not None:
