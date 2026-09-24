@@ -726,8 +726,8 @@ TRAIN_SPECIMENS = {{
     "PC160": 1.0,
 }}
 # Validation (not in the joint fit): path-ordered + digitized unordered.
-# B6 ≈ constant large cycles; CB225 = growing multi-amplitude protocol.
-VALIDATION_SPECIMENS = ["PC350", "B6", "CB225"]
+# B6 / A5 = digitized; CB225 = growing multi-amplitude protocol.
+VALIDATION_SPECIMENS = ["PC350", "B6", "CB225", "A5"]
 PREPARE_DATA = True
 
 SET_ID_ROW = {{
