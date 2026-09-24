@@ -59,3 +59,7 @@ bayesian/config/cycle_meta.json
 
 # Full pipeline zip snapshots (archive_pipeline_outputs.ps1 / .sh)
 run_snapshots/
+
+# Local receiver / smoke-test logs
+receiver_*.log
+
