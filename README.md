@@ -42,6 +42,8 @@ $env:PYTHON = "C:\path\to\python.exe"
 
 If you only want parameters for **one** test specimen, start with §1 (single specimen). That is the smallest end-to-end path: edit one CSV, run one command, read one params file and one overlay plot.
 
+Interactive walkthroughs (edit a **Parameters** cell, then run): see [`notebooks/`](notebooks/README.md) — single, individual (2–3 specimens), and generalized demos.
+
 To see the numerical model in plain, editable form (geometry and SteelMPF numbers at the top of one file):
 
 ```bash
@@ -142,10 +144,12 @@ Standalone helper for uncertainty quantification on specimen **CB225** with quoF
 config/calibration/   # Specimens, set_id settings, bounds  ← edit these
 config/figure.mplstyle
 data/raw/             # Experimental CSVs
+notebooks/            # Walkthrough notebooks (single / individual / generalized)
 scripts/model/        # SteelMPF + corotational truss
 scripts/postprocess/  # Filter / resample
 scripts/calibrate/    # Individual + generalized optimization
 scripts/calibrate_single/  # One-specimen entry point
+scripts/examples/     # Simple BRB script + notebook helpers
 bayesian/             # Optional UQ
 results/              # Generated (gitignored)
 ```

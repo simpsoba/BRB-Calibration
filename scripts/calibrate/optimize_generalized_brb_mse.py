@@ -487,6 +487,16 @@ def main() -> None:
         default=None,
         help="If set, only this Name is optimized and evaluated.",
     )
+    p.add_argument(
+        "--train-specimens",
+        type=str,
+        default=None,
+        help=(
+            "Comma-separated Names to restrict train + eval (e.g. PC250,PC350,PC3SB). "
+            "Useful for notebook demos; ignored names with generalized_weight=0 still "
+            "do not enter the joint fit."
+        ),
+    )
     _pl_rel = PARAM_LIMITS_CSV
     try:
         _pl_rel = PARAM_LIMITS_CSV.relative_to(_PROJECT_ROOT)
@@ -563,6 +573,30 @@ def main() -> None:
         available_unordered = [args.specimen] if args.specimen in available_unordered else []
         if not available_resampled:
             raise SystemExit("Generalized training requires resampled data for --specimen.")
+
+    if args.train_specimens:
+        if args.specimen:
+            raise SystemExit("Use only one of --specimen or --train-specimens.")
+        wanted = [s.strip() for s in str(args.train_specimens).split(",") if s.strip()]
+        if not wanted:
+            raise SystemExit("--train-specimens is empty.")
+        missing = [
+            n
+            for n in wanted
+            if n not in available_resampled and n not in available_unordered
+        ]
+        if missing:
+            raise SystemExit(
+                f"--train-specimens not found in resampled/unordered data: {missing}"
+            )
+        wanted_set = set(wanted)
+        available_resampled = [n for n in available_resampled if n in wanted_set]
+        available_unordered = [n for n in available_unordered if n in wanted_set]
+        if not available_resampled:
+            raise SystemExit(
+                "--train-specimens: need at least one path-ordered resampled Name for training."
+            )
+        line(f"train/eval specimen filter: {available_resampled}")
 
     default_list = list(PARAMS_TO_OPTIMIZE)
     opt_csv = (

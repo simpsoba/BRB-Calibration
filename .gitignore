@@ -63,3 +63,7 @@ run_snapshots/
 # Local receiver / smoke-test logs
 receiver_*.log
 
+
+# Notebook demo outputs
+results/notebooks/
+
