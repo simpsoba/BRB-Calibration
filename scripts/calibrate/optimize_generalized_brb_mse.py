@@ -31,6 +31,7 @@ Digitized unordered specimens use the pipeline resampled deformation drive when 
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from collections import Counter
 from dataclasses import dataclass
@@ -492,9 +493,19 @@ def main() -> None:
         type=str,
         default=None,
         help=(
-            "Comma-separated Names to restrict train + eval (e.g. PC250,PC350,PC3SB). "
-            "Useful for notebook demos; ignored names with generalized_weight=0 still "
-            "do not enter the joint fit."
+            "Comma-separated train Names, optional per-specimen weights as Name:weight "
+            "(e.g. PC250:1,PC3SB:2,STF01). Bare Name defaults to weight 1. Requires "
+            "path-ordered resampled force_deformation. Catalog generalized_weight is ignored."
+        ),
+    )
+    p.add_argument(
+        "--eval-specimens",
+        type=str,
+        default=None,
+        help=(
+            "Comma-separated Names evaluated after the joint fit but not trained on "
+            "(weight 0). Use with --train-specimens for validation specimens: "
+            "path-ordered and/or digitized unordered. Bare Name only (no :weight)."
         ),
     )
     _pl_rel = PARAM_LIMITS_CSV
@@ -549,7 +560,8 @@ def main() -> None:
     catalog = read_catalog()
     catalog_by_name = catalog.set_index("Name")
     norm_xy_half = compute_raw_filtered_global_norm_limits(catalog, project_root=_PROJECT_ROOT)
-    generalized_w_fn = make_generalized_weight_fn(catalog)
+    catalog_weight_fn = make_generalized_weight_fn(catalog)
+    generalized_w_fn = catalog_weight_fn
     weight_tag = weight_config_tag(catalog)
 
     resampled_stems = path_ordered_resampled_force_csv_stems(catalog, project_root=_PROJECT_ROOT)
@@ -577,7 +589,30 @@ def main() -> None:
     if args.train_specimens:
         if args.specimen:
             raise SystemExit("Use only one of --specimen or --train-specimens.")
-        wanted = [s.strip() for s in str(args.train_specimens).split(",") if s.strip()]
+        weight_by_name: dict[str, float] = {}
+        for tok in str(args.train_specimens).split(","):
+            tok = tok.strip()
+            if not tok:
+                continue
+            if ":" in tok:
+                name_s, _, w_s = tok.partition(":")
+                name_s = name_s.strip()
+                try:
+                    w_v = float(w_s.strip())
+                except ValueError as exc:
+                    raise SystemExit(
+                        f"--train-specimens: bad weight in {tok!r} (expected Name:weight)"
+                    ) from exc
+            else:
+                name_s, w_v = tok, 1.0
+            if not name_s:
+                raise SystemExit(f"--train-specimens: empty Name in {tok!r}")
+            if not math.isfinite(w_v) or w_v < 0.0:
+                raise SystemExit(
+                    f"--train-specimens: weight for {name_s!r} must be finite and >= 0 (got {w_v})"
+                )
+            weight_by_name[name_s] = float(w_v)
+        wanted = list(weight_by_name.keys())
         if not wanted:
             raise SystemExit("--train-specimens is empty.")
         missing = [
@@ -589,15 +624,73 @@ def main() -> None:
             raise SystemExit(
                 f"--train-specimens not found in resampled/unordered data: {missing}"
             )
+        not_path_ordered = [n for n in wanted if n not in available_resampled]
+        if not_path_ordered:
+            raise SystemExit(
+                "--train-specimens requires path-ordered resampled force_deformation data; "
+                f"not eligible for joint fit: {not_path_ordered}"
+            )
         wanted_set = set(wanted)
-        available_resampled = [n for n in available_resampled if n in wanted_set]
-        available_unordered = [n for n in available_unordered if n in wanted_set]
-        if not available_resampled:
+        eval_extra: list[str] = []
+        if args.eval_specimens:
+            for tok in str(args.eval_specimens).split(","):
+                tok = tok.strip()
+                if not tok:
+                    continue
+                if ":" in tok:
+                    raise SystemExit(
+                        f"--eval-specimens: unexpected ':weight' in {tok!r} "
+                        "(validation Names have weight 0)"
+                    )
+                eval_extra.append(tok)
+            missing_eval = [
+                n
+                for n in eval_extra
+                if n not in available_resampled and n not in available_unordered
+            ]
+            if missing_eval:
+                raise SystemExit(
+                    f"--eval-specimens not found in resampled/unordered data: {missing_eval}"
+                )
+            overlap = [n for n in eval_extra if n in wanted_set]
+            if overlap:
+                line(
+                    f"note: --eval-specimens overlap with --train-specimens "
+                    f"(kept as train with listed weight): {overlap}"
+                )
+        eval_set = wanted_set | set(eval_extra)
+        available_resampled = [n for n in available_resampled if n in eval_set]
+        available_unordered = [n for n in available_unordered if n in eval_set]
+        train_resampled = [n for n in available_resampled if n in wanted_set]
+        if not train_resampled:
             raise SystemExit(
                 "--train-specimens: need at least one path-ordered resampled Name for training."
             )
-        line(f"train/eval specimen filter: {available_resampled}")
+        if all(weight_by_name.get(n, 0.0) <= 0.0 for n in train_resampled):
+            raise SystemExit(
+                "--train-specimens: at least one path-ordered Name needs weight > 0."
+            )
 
+        # Explicit train list: catalog generalized_weight does not gate membership.
+        # Eval-only Names (from --eval-specimens) get weight 0 → metrics/plots, no train.
+        def generalized_w_fn(name: str) -> float:  # noqa: F811
+            return float(weight_by_name.get(str(name).strip(), 0.0))
+
+        weight_tag = "train_specimens_explicit"
+        wdesc = ", ".join(f"{n}={weight_by_name[n]:g}" for n in train_resampled)
+        val_po = [n for n in available_resampled if n not in wanted_set]
+        val_un = list(available_unordered)
+        line(
+            f"train specimens: {train_resampled} (weights {wdesc}; "
+            "catalog generalized_weight ignored)"
+        )
+        if val_po or val_un:
+            line(
+                f"validation eval: path-ordered={val_po or '—'}  "
+                f"digitized-unordered={val_un or '—'}"
+            )
+    elif args.eval_specimens:
+        raise SystemExit("--eval-specimens requires --train-specimens.")
     default_list = list(PARAMS_TO_OPTIMIZE)
     opt_csv = (
         Path(args.set_id_settings).expanduser().resolve()
@@ -765,7 +858,13 @@ def main() -> None:
             if not train_run:
                 line(
                     f"skip set_id={run_id}: no training instances "
-                    "(positive generalized_weight + resampled path-ordered data in catalog)"
+                    "(need path-ordered resampled data"
+                    + (
+                        " in --train-specimens"
+                        if args.train_specimens
+                        else " with positive generalized_weight"
+                    )
+                    + ")"
                 )
                 continue
             active = resolve_optimize_params_for_set_id(opt_map, run_id, default_list)

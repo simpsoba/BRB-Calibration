@@ -29,6 +29,8 @@ paper/
 
 # Generated logs (optional: mirror with PIPELINE_LOG)
 pipeline_log.txt
+pipeline_verify.log
+notebook_execute.log
 
 # Pipeline-regenerated outputs (see clean_outputs.ps1 / clean_outputs.sh).
 # If these paths were ever committed, stop tracking once with:

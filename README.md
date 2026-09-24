@@ -40,9 +40,18 @@ $env:PYTHON = "C:\path\to\python.exe"
 
 **Do not copy folders out of the repo.** Scripts expect the repo layout (`config/`, `data/`, `scripts/`). Stay in the clone and use the commands below.
 
-If you only want parameters for **one** test specimen, start with §1 (single specimen). That is the smallest end-to-end path: edit one CSV, run one command, read one params file and one overlay plot.
+### Notebooks or automated pipeline?
 
-Interactive walkthroughs (edit a **Parameters** cell, then run): see [`notebooks/`](notebooks/README.md) — single, individual (2–3 specimens), and generalized demos.
+Two ways to use this repo:
+
+| Path | Best when… |
+|------|------------|
+| **[`notebooks/`](notebooks/README.md)** | You want an interactive demo: browse the specimen catalog, edit a **Parameters** cell, run cells, and see plots inline. Good for learning SteelMPF (`00`), trying one brace (`01`), a few braces (`02`), or a small joint fit (`03`). |
+| **CLI / `run.sh` · `run.ps1`** | You want the full automated workflow over the catalog (postprocess → individual → generalized → reports) without opening Jupyter. |
+
+They share the same underlying calibrate helpers. Notebooks write under `results/notebooks/`; the automated pipeline writes under `results/calibration/` and `results/plots/`. If you are more comfortable in notebooks, **run the notebooks instead** — you do not need `run.ps1` / `run.sh` for that.
+
+If you only want parameters for **one** test specimen from the command line, start with §1 (single specimen): edit one CSV, run one command, read one params file and one overlay plot.
 
 To see the numerical model in plain, editable form (geometry and SteelMPF numbers at the top of one file):
 
@@ -144,7 +153,7 @@ Standalone helper for uncertainty quantification on specimen **CB225** with quoF
 config/calibration/   # Specimens, set_id settings, bounds  ← edit these
 config/figure.mplstyle
 data/raw/             # Experimental CSVs
-notebooks/            # Walkthrough notebooks (single / individual / generalized)
+notebooks/            # Walkthrough notebooks (00 SteelMPF / single / individual / generalized)
 scripts/model/        # SteelMPF + corotational truss
 scripts/postprocess/  # Filter / resample
 scripts/calibrate/    # Individual + generalized optimization

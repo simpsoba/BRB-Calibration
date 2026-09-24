@@ -1,4 +1,4 @@
-# BRB-Calibration figure style (Baker / Communication by Design inspired)
+# BRB-Calibration figure style for hysteresis overlays and reports.
 # Load via postprocess.plot_dimensions.configure_matplotlib_style()
 
 figure.autolayout: False

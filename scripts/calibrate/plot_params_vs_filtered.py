@@ -349,8 +349,12 @@ def plot_force_def_overlays(
     overlay_axes: ForceDefOverlayAxisSpecs | None = None,
     numerical_color: str = COLOR_NUMERICAL_COHORT,
     show_numerical_curve: bool = True,
+    show: bool = False,
 ) -> None:
-    """Create physical and normalized force–deformation overlays."""
+    """Create physical and normalized force–deformation overlays.
+
+    If ``show`` is True (notebooks), display figures inline before closing them.
+    """
     y_phys_components = [F_exp_kip]
     if show_numerical_curve:
         y_phys_components.append(F_sim_kip)
@@ -399,6 +403,7 @@ def plot_force_def_overlays(
         ax1.axhline(0, color="k", linewidth=AXES_SPINE_LINEWIDTH_SINGLE_AX)
         ax1.axvline(0, color="k", linewidth=AXES_SPINE_LINEWIDTH_SINGLE_AX)
         style_single_axis_spines(ax1)
+        out_dir.mkdir(parents=True, exist_ok=True)
         fig1.savefig(out_dir / f"{specimen_id}_set{set_id}_force_def.png", dpi=SAVE_DPI)
         plt.close(fig1)
 
@@ -464,6 +469,13 @@ def plot_force_def_overlays(
         ax2.axvline(0, color="k", linewidth=AXES_SPINE_LINEWIDTH_SINGLE_AX)
         style_single_axis_spines(ax2)
         fig2.savefig(out_dir / f"{specimen_id}_set{set_id}_force_def_norm.png", dpi=SAVE_DPI)
+        if show:
+            try:
+                from IPython.display import display as _display
+
+                _display(fig2)
+            except Exception:
+                plt.show(block=False)
         plt.close(fig2)
 
 
@@ -739,8 +751,12 @@ def run_one_specimen(
     override_b_p: float | None = None,
     override_b_n: float | None = None,
     force_deformation_csv: Path | None = None,
+    show: bool = False,
 ) -> None:
-    """Run simulation and plot overlays for one specimen (possibly multiple parameter sets)."""
+    """Run simulation and plot overlays for one specimen (possibly multiple parameter sets).
+
+    ``show=True`` displays figures inline (notebooks) while still writing PNGs to ``out_dir``.
+    """
     csv_path = (
         Path(force_deformation_csv).expanduser().resolve()
         if force_deformation_csv is not None
@@ -826,6 +842,7 @@ def run_one_specimen(
             out_dir=out_dir,
             norm_xy_half=norm_xy_half,
             overlay_axes=overlay_axes,
+            show=show,
         )
         _write_overlay_params_txt(
             out_dir,
